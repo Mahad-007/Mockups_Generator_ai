@@ -79,3 +79,50 @@ def delete_file(relative_path: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def save_bytes(data: bytes, folder: str, filename: str) -> str:
+    """
+    Save raw bytes to storage.
+
+    Args:
+        data: Raw bytes to save
+        folder: Subfolder (exports, etc.)
+        filename: Filename to use
+
+    Returns:
+        Relative path to saved file
+    """
+    folder_path = settings.upload_dir / folder
+    folder_path.mkdir(parents=True, exist_ok=True)
+
+    file_path = folder_path / filename
+    file_path.write_bytes(data)
+
+    return f"{folder}/{filename}"
+
+
+class StorageService:
+    """Storage service class for dependency injection."""
+
+    def save_image(self, image: Image.Image, folder: str, filename: str = None) -> str:
+        return save_image(image, folder, filename)
+
+    def save_upload(self, file_bytes: bytes, folder: str, original_filename: str) -> str:
+        return save_upload(file_bytes, folder, original_filename)
+
+    def save_bytes(self, data: bytes, folder: str, filename: str) -> str:
+        return save_bytes(data, folder, filename)
+
+    def get_image(self, relative_path: str) -> Image.Image:
+        return get_image(relative_path)
+
+    def get_full_path(self, relative_path: str) -> Path:
+        return get_full_path(relative_path)
+
+    def delete_file(self, relative_path: str) -> bool:
+        return delete_file(relative_path)
+
+
+# Singleton instance
+storage_service = StorageService()

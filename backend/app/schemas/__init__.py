@@ -9,6 +9,16 @@ from app.schemas.chat import (
     RefinementSuggestion,
     RefinementSuggestionsResponse,
 )
+from app.schemas.brand import (
+    BrandBase,
+    BrandCreate,
+    BrandUpdate,
+    BrandResponse,
+    BrandExtractRequest,
+    BrandExtractResponse,
+    BrandPromptResponse,
+    BrandScenesResponse,
+)
 
 __all__ = [
     "ProductBase",
@@ -23,4 +33,13 @@ __all__ = [
     "ChatSessionResponse",
     "RefinementSuggestion",
     "RefinementSuggestionsResponse",
+    # Brand schemas
+    "BrandBase",
+    "BrandCreate",
+    "BrandUpdate",
+    "BrandResponse",
+    "BrandExtractRequest",
+    "BrandExtractResponse",
+    "BrandPromptResponse",
+    "BrandScenesResponse",
 ]

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         (self.upload_dir / "products").mkdir(exist_ok=True)
         (self.upload_dir / "mockups").mkdir(exist_ok=True)
+        (self.upload_dir / "refinements").mkdir(exist_ok=True)
+        (self.upload_dir / "exports").mkdir(exist_ok=True)
+        (self.upload_dir / "logos").mkdir(exist_ok=True)
 
 
 @lru_cache()

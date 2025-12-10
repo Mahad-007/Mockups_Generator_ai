@@ -18,6 +18,8 @@ class MockupGenerateRequest(BaseModel):
     scene_template_id: Optional[str] = "studio-white"
     custom_prompt: Optional[str] = None
     customization: Optional[CustomizationOptions] = None
+    # Brand DNA integration
+    brand_id: Optional[str] = None  # Apply brand styling to generation
 
 
 class MockupResponse(BaseModel):
@@ -27,6 +29,8 @@ class MockupResponse(BaseModel):
     image_url: str
     scene_template_id: Optional[str] = None
     prompt_used: Optional[str] = None
+    brand_id: Optional[str] = None
+    brand_applied: Optional[Dict[str, Any]] = None  # Details of brand styling applied
     created_at: datetime
 
     class Config:

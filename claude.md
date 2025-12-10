@@ -681,8 +681,35 @@ docker-compose down           # Stop all services
   - Undo functionality
   - Real-time image updates
   - Integrated chat panel in generation flow
-- [ ] Phase 4: Batch & Export
-- [ ] Phase 5: Brand Features
+- [x] Phase 4: Batch & Export (Completed)
+  - Batch job queue system with async task processing
+  - Parallel mockup generation with progress tracking
+  - Variation generation (angles, lighting, backgrounds, styles)
+  - 3 variation presets: quick, standard, comprehensive
+  - Export optimizer with 18+ platform presets
+  - Platform categories: social, e-commerce, website, print
+  - Single export with preset/custom dimensions
+  - Batch export to ZIP file
+  - Multi-preset export (all sizes at once)
+  - Frontend ExportModal with preset selection
+  - Frontend BatchGenerator component with progress UI
+- [x] Phase 5: Brand Features (Completed)
+  - Brand model with colors, fonts, mood, style, industry
+  - Full Brand CRUD API with database operations
+  - Brand extraction service (colors from logo images)
+  - AI-powered brand mood detection via Gemini
+  - Brand-aware mockup generation with prompt enhancement
+  - Color palette extraction using quantization
+  - Automatic scene suggestions based on brand attributes
+  - Brand-influenced lighting preferences
+  - Frontend brands API client
+  - Brand Management page with creation wizard
+  - 3-step brand creation flow (basics, extract, customize)
+  - Color picker component for palette editing
+  - Brand card component with color preview
+  - BrandSelector component in generation flow
+  - Default brand auto-selection
+  - Brand styling indicators in generated mockups
 - [ ] Phase 6: Context-Aware Suggestions
 - [ ] Phase 7: Smart Compositing
 - [ ] Phase 8: User System
