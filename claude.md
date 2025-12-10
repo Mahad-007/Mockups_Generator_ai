@@ -715,7 +715,10 @@ docker-compose down           # Stop all services
   - Contextual scene recommender blending product + brand + trending + seasonal signals
   - Scene suggestions API with relevance scoring and feedback capture
   - Frontend AI suggestion rail with reasons, badges, and quick-select
-- [ ] Phase 7: Smart Compositing
+- [x] Phase 7: Smart Compositing
+  - Rembg matting refinements for glass/reflective products with shadow rescue
+  - Lighting-aware compositor with auto scaling/anchoring, reflections, DOF, and polish
+  - Gemini scene generation + smart compositing pipeline with AI-direct fallback
 - [ ] Phase 8: User System
 - [ ] Phase 9: Canvas Editor
 - [ ] Phase 10: API & Integrations

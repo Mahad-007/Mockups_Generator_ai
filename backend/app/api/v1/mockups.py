@@ -7,6 +7,7 @@ from typing import Optional
 from app.core.database import get_db
 from app.core.storage import get_image, save_image
 from app.core.gemini import gemini_client
+from app.core.compositor import compositor
 from app.core.scene_generator import get_template, build_customized_prompt
 from app.core.utils import get_image_url
 from app.models import Product, Mockup, Brand
@@ -129,11 +130,32 @@ async def generate_mockup(
     image_path = product.processed_image_path or product.original_image_path
     product_image = get_image(image_path)
 
-    # Generate mockup with AI
-    mockup_image = await gemini_client.generate_mockup(
+    # Try generating a background and performing smart compositing first
+    mockup_image = None
+    pipeline_used = "smart_composite"
+
+    background_image = await gemini_client.generate_scene_image(
+        scene_prompt=scene_prompt,
         product_image=product_image,
-        scene_description=scene_prompt,
     )
+
+    if background_image:
+        mockup_image = await compositor.smart_composite(
+            product=product_image,
+            background=background_image,
+            lighting_hint=request.customization.lighting if request.customization else None,
+            angle_hint=request.customization.angle if request.customization else None,
+        )
+    else:
+        pipeline_used = "ai-direct"
+
+    # Fallback to direct AI mockup if background generation/compositing fails
+    if mockup_image is None:
+        mockup_image = await gemini_client.generate_mockup(
+            product_image=product_image,
+            scene_description=scene_prompt,
+        )
+        pipeline_used = "ai-direct"
 
     if not mockup_image:
         raise HTTPException(
@@ -154,6 +176,7 @@ async def generate_mockup(
     if brand:
         generation_params["brand_id"] = brand.id
         generation_params["brand_name"] = brand.name
+    generation_params["pipeline"] = pipeline_used
 
     # Create database record
     mockup = Mockup(

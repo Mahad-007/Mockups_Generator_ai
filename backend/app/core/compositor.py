@@ -1,10 +1,105 @@
-from PIL import Image, ImageFilter, ImageEnhance
+from PIL import Image, ImageFilter, ImageEnhance, ImageDraw
 import numpy as np
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 
 class Compositor:
     """Handles compositing products onto scene backgrounds."""
+
+    async def smart_composite(
+        self,
+        product: Image.Image,
+        background: Image.Image,
+        position: Tuple[int, int] = None,
+        scale: float = None,
+        lighting_hint: Optional[str] = None,
+        angle_hint: Optional[str] = None,
+        add_reflection: bool = True,
+        add_depth_of_field: bool = True,
+    ) -> Image.Image:
+        """
+        Composite with lighting/perspective analysis and quality polish.
+
+        - Estimates lighting direction to orient shadows
+        - Matches product color/brightness to scene
+        - Adds reflections when surface likely supports it
+        - Applies subtle depth-of-field and sharpening
+        """
+        product = product.convert("RGBA")
+        background = background.convert("RGBA")
+
+        bg_stats = self._analyze_background(background)
+
+        # Determine scale and resize product
+        if scale is None:
+            scale = self._calculate_auto_scale(
+                product,
+                background,
+                max_coverage=bg_stats["coverage_hint"],
+            )
+        product = product.resize(
+            (int(product.width * scale), int(product.height * scale)),
+            Image.Resampling.LANCZOS,
+        )
+
+        # Light/temperature match
+        product = await self.match_lighting(product, background)
+
+        # Perspective alignment based on angle hints
+        if angle_hint:
+            product = self._apply_perspective_hint(product, angle_hint)
+
+        # Auto position toward lower third if none provided
+        if position is None:
+            position = self._anchor_position(background.size, product.size)
+
+        # Prepare result and optional depth of field
+        base_bg = background.copy()
+        if add_depth_of_field:
+            base_bg = self._apply_depth_of_field(base_bg, position, product.size)
+
+        # Shadow parameters derived from lighting analysis
+        shadow_offset, shadow_blur, shadow_opacity = self._shadow_from_lighting(
+            bg_stats,
+            lighting_hint,
+            product.size,
+        )
+
+        result = base_bg
+
+        # Add shadow
+        shadow = await self._create_shadow(
+            product,
+            shadow_opacity,
+            shadow_offset,
+            shadow_blur,
+        )
+        shadow_pos = (
+            position[0] + shadow_offset[0],
+            position[1] + shadow_offset[1],
+        )
+        result.paste(shadow, shadow_pos, shadow)
+
+        # Paste product
+        result.paste(product, position, product)
+
+        # Optional reflection for glossy/flat surfaces
+        if add_reflection and bg_stats["supports_reflection"]:
+            reflection = await self.add_reflection(
+                product,
+                background,
+                reflection_opacity=bg_stats["reflection_strength"],
+                reflection_height=0.28,
+            )
+            ref_pos = (
+                position[0],
+                position[1] + product.height - int(product.height * 0.05),
+            )
+            result.paste(reflection, ref_pos, reflection)
+
+        # Final polish (upscale + light sharpening + grain matching)
+        result = self._final_polish(result, bg_stats)
+        return result
 
     async def composite(
         self,
@@ -213,6 +308,157 @@ class Compositor:
         b = b.point(lambda x: max(0, int(x * (1 - warmth))))
 
         return Image.merge("RGB", (r, g, b))
+
+    def _analyze_background(self, background: Image.Image) -> Dict:
+        """Lightweight background analysis for lighting/reflection hints."""
+        rgb = np.array(background.convert("RGB")).astype(np.float32)
+        h, w, _ = rgb.shape
+
+        brightness_map = rgb.mean(axis=2)
+        mean_brightness = float(brightness_map.mean() / 255)
+        contrast = float(brightness_map.std() / 255)
+
+        # Brightness distribution to infer light direction
+        x_weights = np.linspace(-1, 1, w)
+        y_weights = np.linspace(-1, 1, h)
+        dx = float((brightness_map.mean(axis=0) * x_weights).mean())
+        dy = float((brightness_map.mean(axis=1) * y_weights).mean())
+
+        # Surface/reflection heuristic: brighter lower band + low contrast implies glossy
+        lower_band = brightness_map[int(h * 0.65) :, :]
+        lower_mean = float(lower_band.mean() / 255) if lower_band.size else mean_brightness
+        supports_reflection = lower_mean > 0.55 and contrast < 0.18
+        reflection_strength = 0.35 if supports_reflection else 0.0
+
+        coverage_hint = 0.55 if contrast > 0.18 else 0.65
+
+        return {
+            "brightness": mean_brightness,
+            "contrast": contrast,
+            "light_direction": (dx, dy),
+            "supports_reflection": supports_reflection,
+            "reflection_strength": reflection_strength,
+            "coverage_hint": coverage_hint,
+        }
+
+    def _anchor_position(self, bg_size: Tuple[int, int], product_size: Tuple[int, int]) -> Tuple[int, int]:
+        """Place product slightly below center to sit on surface."""
+        bw, bh = bg_size
+        pw, ph = product_size
+        x = (bw - pw) // 2
+        y = int(bh * 0.58) - (ph // 2)
+        y = max(0, min(y, bh - ph))
+        return (x, y)
+
+    def _shadow_from_lighting(
+        self,
+        bg_stats: Dict,
+        lighting_hint: Optional[str],
+        product_size: Tuple[int, int],
+    ) -> Tuple[Tuple[int, int], int, float]:
+        """Derive shadow offset/blur/opacity from lighting cues."""
+        dx, dy = bg_stats["light_direction"]
+        width, height = product_size
+        base_offset = (8, max(8, int(height * 0.04)))
+
+        if lighting_hint:
+            hint = lighting_hint.lower()
+            if "left" in hint:
+                dx = -0.8
+            elif "right" in hint:
+                dx = 0.8
+            if "top" in hint:
+                dy = -0.4
+            elif "bottom" in hint:
+                dy = 0.6
+
+        offset = (
+            int(base_offset[0] + dx * 12),
+            int(base_offset[1] + dy * 10),
+        )
+        blur = max(10, int(min(width, height) * (0.06 + bg_stats["contrast"] * 0.3)))
+        opacity = 0.22 + min(bg_stats["contrast"] * 0.9, 0.35)
+        return offset, blur, opacity
+
+    def _apply_perspective_hint(self, image: Image.Image, hint: str) -> Image.Image:
+        """Apply a mild perspective warp based on angle hint."""
+        hint = hint.lower()
+        shear_x = 0.0
+        shear_y = 0.0
+
+        if "top" in hint:
+            shear_y = -0.08
+        elif "low" in hint or "side" in hint:
+            shear_y = 0.05
+
+        if "45" in hint or "angle" in hint:
+            shear_x = 0.08
+        elif "side" in hint:
+            shear_x = 0.12
+
+        if shear_x == 0 and shear_y == 0:
+            return image
+
+        w, h = image.size
+        matrix = (1, shear_x, 0, shear_y, 1, 0)
+        return image.transform(
+            (w, h),
+            Image.Transform.AFFINE,
+            matrix,
+            resample=Image.Resampling.BICUBIC,
+            fillcolor=(0, 0, 0, 0),
+        )
+
+    def _apply_depth_of_field(
+        self,
+        background: Image.Image,
+        position: Tuple[int, int],
+        product_size: Tuple[int, int],
+    ) -> Image.Image:
+        """Subtle background blur outside the product focus zone."""
+        blurred = background.filter(ImageFilter.GaussianBlur(radius=2.8))
+        mask = Image.new("L", background.size, 255)
+        draw = ImageDraw.Draw(mask)
+
+        pad_w = int(product_size[0] * 0.35)
+        pad_h = int(product_size[1] * 0.35)
+        box = (
+            max(0, position[0] - pad_w),
+            max(0, position[1] - pad_h),
+            min(background.width, position[0] + product_size[0] + pad_w),
+            min(background.height, position[1] + product_size[1] + pad_h),
+        )
+        draw.rectangle(box, fill=0)
+        mask = mask.filter(ImageFilter.GaussianBlur(radius=12))
+        return Image.composite(blurred, background, mask)
+
+    def _final_polish(self, image: Image.Image, bg_stats: Dict) -> Image.Image:
+        """Upscale small outputs, add light sharpening and grain to match scene texture."""
+        target_min = 1400
+        w, h = image.size
+        if min(w, h) < target_min:
+            scale = target_min / min(w, h)
+            image = image.resize(
+                (int(w * scale), int(h * scale)),
+                Image.Resampling.LANCZOS,
+            )
+            w, h = image.size
+
+        image = image.filter(ImageFilter.UnsharpMask(radius=1.4, percent=120, threshold=3))
+
+        # Subtle noise to blend product and scene
+        noise_strength = 0.012 + (bg_stats["contrast"] * 0.01)
+        arr = np.array(image).astype(np.float32)
+        noise = np.random.normal(0, 255 * noise_strength, size=arr.shape[:2] + (1,))
+        if arr.shape[2] == 4:
+            rgb = arr[:, :, :3]
+            alpha = arr[:, :, 3:]
+            rgb = np.clip(rgb + noise, 0, 255)
+            arr = np.concatenate([rgb, alpha], axis=2)
+        else:
+            arr = np.clip(arr + noise, 0, 255)
+
+        return Image.fromarray(arr.astype(np.uint8))
 
 
 # Singleton instance
