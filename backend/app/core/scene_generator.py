@@ -513,6 +513,36 @@ COLOR_SCENE_MAP: Dict[str, List[str]] = {
     "cool": ["studio-gray", "outdoor-nature", "studio-gradient"],
 }
 
+# Usage context nudges derived from product analysis
+USAGE_CONTEXT_HINTS: Dict[str, List[str]] = {
+    "desk": ["lifestyle-desk", "studio-gray"],
+    "workspace": ["lifestyle-desk", "studio-gray"],
+    "office": ["lifestyle-desk", "studio-gray"],
+    "kitchen": ["lifestyle-kitchen"],
+    "bathroom": ["lifestyle-bathroom", "premium-marble"],
+    "spa": ["lifestyle-bathroom", "premium-marble"],
+    "outdoor": ["outdoor-nature", "outdoor-urban"],
+    "fitness": ["outdoor-nature", "outdoor-urban", "studio-white"],
+    "gym": ["outdoor-nature", "outdoor-urban", "studio-white"],
+    "travel": ["outdoor-urban", "outdoor-nature"],
+    "home": ["lifestyle-living-room", "lifestyle-bedroom"],
+    "social": ["social-instagram"],
+}
+
+# Audience hints to tilt suggestions toward the right vibe
+AUDIENCE_HINTS: Dict[str, List[str]] = {
+    "professional": ["studio-gray", "premium-dark"],
+    "executive": ["premium-dark", "premium-marble"],
+    "luxury": ["premium-marble", "premium-velvet"],
+    "young": ["social-instagram", "studio-colored"],
+    "teen": ["social-instagram", "studio-colored"],
+    "youth": ["social-instagram", "studio-colored"],
+    "family": ["lifestyle-living-room", "lifestyle-bedroom"],
+    "fitness": ["outdoor-nature", "outdoor-urban"],
+    "outdoor": ["outdoor-nature", "outdoor-urban"],
+    "eco": ["outdoor-nature", "seasonal-spring"],
+}
+
 # Trending/seasonal awareness
 TRENDING_BY_CATEGORY: Dict[str, List[str]] = {
     "electronics": ["lifestyle-desk", "premium-dark"],
@@ -580,11 +610,24 @@ def _color_profile(color: Optional[str]) -> Optional[str]:
     return None
 
 
+def _match_hints(text: Optional[str], mapping: Dict[str, List[str]]) -> List[str]:
+    """Return scene IDs whose keyword appears in the provided text."""
+    if not text:
+        return []
+    lowered = text.lower()
+    matched: List[str] = []
+    for keyword, scenes in mapping.items():
+        if keyword in lowered:
+            matched.extend(scenes)
+    return matched
+
+
 def _candidate_scene_ids(
     normalized_category: str,
     attributes: Dict,
     brand_context: Dict,
     season: Optional[str],
+    trending_counts: Optional[Dict[str, int]] = None,
 ) -> List[str]:
     candidates = []
 
@@ -610,12 +653,24 @@ def _candidate_scene_ids(
     brand_suggestions = brand_context.get("suggested_scenes") or []
     candidates.extend(brand_suggestions)
 
+    # Product AI hints
+    ai_suggested = attributes.get("suggested_scenes") or []
+    if isinstance(ai_suggested, list):
+        candidates.extend(ai_suggested)
+
+    # Usage context + audience hints
+    candidates.extend(_match_hints(attributes.get("usage_context"), USAGE_CONTEXT_HINTS))
+    candidates.extend(_match_hints(attributes.get("target_audience"), AUDIENCE_HINTS))
+
     # Seasonal boost
     if season and season in SEASONAL_SCENES:
         candidates.extend(SEASONAL_SCENES[season])
 
     # Trending
-    if normalized_category in TRENDING_BY_CATEGORY:
+    if trending_counts:
+        ordered_trending = sorted(trending_counts.items(), key=lambda item: item[1], reverse=True)
+        candidates.extend([scene_id for scene_id, _ in ordered_trending])
+    elif normalized_category in TRENDING_BY_CATEGORY:
         candidates.extend(TRENDING_BY_CATEGORY[normalized_category])
 
     # Defaults
@@ -638,6 +693,7 @@ def _score_template(
     brand_context: Dict,
     season: Optional[str],
     index_hint: int,
+    trending_counts: Optional[Dict[str, int]] = None,
 ) -> Tuple[float, List[Dict], bool, Optional[str]]:
     """Compute a relevance score and reasons for a template."""
     reasons: List[Dict] = []
@@ -662,6 +718,24 @@ def _score_template(
         score += 0.12
         reasons.append({"label": "Color harmony", "detail": f"Balances {color_profile} colored products"})
 
+    # Product AI hints (Gemini Vision suggested scenes)
+    suggested = attributes.get("suggested_scenes") or []
+    if isinstance(suggested, list) and template.id in suggested:
+        score += 0.2
+        reasons.append({"label": "AI vision hint", "detail": "Gemini flagged this scene for your product"})
+
+    # Usage context influence
+    usage_matches = _match_hints(attributes.get("usage_context"), USAGE_CONTEXT_HINTS)
+    if template.id in usage_matches:
+        score += 0.12
+        reasons.append({"label": "Usage fit", "detail": "Aligns with where the product is typically used"})
+
+    # Audience influence
+    audience_matches = _match_hints(attributes.get("target_audience"), AUDIENCE_HINTS)
+    if template.id in audience_matches:
+        score += 0.1
+        reasons.append({"label": "Audience fit", "detail": "Matches the target audience vibe"})
+
     # Brand alignment
     brand_scenes = brand_context.get("suggested_scenes") or []
     if template.id in brand_scenes:
@@ -671,11 +745,19 @@ def _score_template(
         score += 0.05
 
     # Trending boost
-    trending_list = TRENDING_BY_CATEGORY.get(normalized_category, [])
-    trending = template.id in trending_list
-    if trending:
-        score += 0.1
-        reasons.append({"label": "Trending", "detail": "Popular in your product category right now"})
+    trending = False
+    if trending_counts:
+        count = trending_counts.get(template.id, 0)
+        if count:
+            trending = True
+            score += 0.08 + min(count / 30, 0.07)
+            reasons.append({"label": "Trending", "detail": "Popular with similar products recently"})
+    else:
+        trending_list = TRENDING_BY_CATEGORY.get(normalized_category, [])
+        trending = template.id in trending_list
+        if trending:
+            score += 0.1
+            reasons.append({"label": "Trending", "detail": "Popular in your product category right now"})
 
     # Seasonal boost
     seasonal_match = None
@@ -697,6 +779,7 @@ def build_scene_suggestions(
     attributes: Optional[Dict] = None,
     brand_context: Optional[Dict] = None,
     limit: int = 6,
+    trending_counts: Optional[Dict[str, int]] = None,
 ) -> List[Dict]:
     """
     Build ranked scene suggestions using product + brand context.
@@ -706,7 +789,7 @@ def build_scene_suggestions(
     normalized_category = normalize_category(product_category or attributes.get("category"))
     season = _detect_season()
 
-    candidate_ids = _candidate_scene_ids(normalized_category, attributes, brand_context, season)
+    candidate_ids = _candidate_scene_ids(normalized_category, attributes, brand_context, season, trending_counts)
 
     suggestions = []
     for idx, scene_id in enumerate(candidate_ids):
@@ -721,6 +804,7 @@ def build_scene_suggestions(
             brand_context,
             season,
             idx,
+            trending_counts,
         )
 
         suggestions.append({

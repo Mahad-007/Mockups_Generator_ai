@@ -57,12 +57,21 @@ async def upload_product(
     # Analyze with AI
     analysis = await gemini_client.analyze_product(image)
 
+    # Consolidate attributes with richer context
+    attributes = analysis.get("attributes") or {}
+    if analysis.get("target_audience"):
+        attributes["target_audience"] = analysis.get("target_audience")
+    if analysis.get("usage_context"):
+        attributes["usage_context"] = analysis.get("usage_context")
+    if analysis.get("suggested_scenes"):
+        attributes["suggested_scenes"] = analysis.get("suggested_scenes")
+
     # Create database record
     product = Product(
         original_image_path=original_path,
         processed_image_path=processed_path,
         category=analysis.get("category"),
-        attributes=analysis.get("attributes"),
+        attributes=attributes,
     )
     db.add(product)
     await db.flush()

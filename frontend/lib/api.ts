@@ -139,7 +139,7 @@ export interface ProductResponse {
   original_image_url: string;
   processed_image_url: string | null;
   category: string | null;
-  attributes: Record<string, string> | null;
+  attributes: Record<string, unknown> | null;
   created_at: string;
 }
 

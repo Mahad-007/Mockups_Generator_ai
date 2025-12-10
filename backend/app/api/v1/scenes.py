@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.core.scene_generator import (
     get_all_templates,
@@ -18,7 +18,7 @@ from app.core.scene_generator import (
     build_scene_suggestions,
 )
 from app.core.database import get_db
-from app.models import Product, Brand
+from app.models import Product, Brand, Mockup
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -98,6 +98,38 @@ class SuggestionFeedbackRequest(BaseModel):
     product_id: Optional[str] = None
     brand_id: Optional[str] = None
     notes: Optional[str] = None
+
+
+async def _get_trending_scenes(
+    db: AsyncSession,
+    product_category: Optional[str],
+    limit: int = 8,
+) -> dict:
+    """
+    Get top scene template counts for the given product category.
+    Provides lightweight trending signals derived from recent mockups.
+    """
+    if not product_category:
+        return {}
+
+    result = await db.execute(
+        select(
+            Mockup.scene_template_id,
+            func.count(Mockup.id).label("count"),
+        )
+        .join(Product, Mockup.product_id == Product.id)
+        .where(Product.category == product_category)
+        .group_by(Mockup.scene_template_id)
+        .order_by(func.count(Mockup.id).desc())
+        .limit(limit)
+    )
+
+    rows = result.all()
+    return {
+        row.scene_template_id: row.count
+        for row in rows
+        if row.scene_template_id
+    }
 
 
 @router.get("/templates", response_model=dict)
@@ -272,11 +304,14 @@ async def get_scene_suggestions(
             "suggested_scenes": brand.suggested_scenes or [],
         }
 
+    trending_counts = await _get_trending_scenes(db, product_category or attributes.get("category"))
+
     raw_suggestions = build_scene_suggestions(
         product_category=product_category,
         attributes=attributes,
         brand_context=brand_context,
         limit=limit,
+        trending_counts=trending_counts,
     )
 
     suggestions = [
