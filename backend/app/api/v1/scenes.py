@@ -1,7 +1,10 @@
 """Scene templates API endpoints."""
-from fastapi import APIRouter, Query
+import logging
+from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.core.scene_generator import (
     get_all_templates,
@@ -12,9 +15,13 @@ from app.core.scene_generator import (
     build_customized_prompt,
     SceneCategory,
     SceneTemplate,
+    build_scene_suggestions,
 )
+from app.core.database import get_db
+from app.models import Product, Brand
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Response schemas
@@ -60,6 +67,37 @@ class CustomizeRequest(BaseModel):
     surface: Optional[str] = None
     lighting: Optional[str] = None
     angle: Optional[str] = None
+
+
+class SceneSuggestionReason(BaseModel):
+    label: str
+    detail: str
+
+
+class SceneSuggestionItem(BaseModel):
+    template: SceneTemplateResponse
+    relevance: float
+    reasons: List[SceneSuggestionReason]
+    trending: bool = False
+    seasonal: Optional[str] = None
+    feedback_token: str
+
+
+class SceneSuggestionsResponse(BaseModel):
+    product_category: Optional[str]
+    product_attributes: dict
+    brand_context: dict
+    suggestions: List[SceneSuggestionItem]
+    seasonal_context: Optional[str] = None
+
+
+class SuggestionFeedbackRequest(BaseModel):
+    feedback_token: str
+    scene_id: str
+    helpful: bool
+    product_id: Optional[str] = None
+    brand_id: Optional[str] = None
+    notes: Optional[str] = None
 
 
 @router.get("/templates", response_model=dict)
@@ -189,67 +227,98 @@ async def customize_template(request: CustomizeRequest):
     }
 
 
-@router.get("/suggestions")
+@router.get("/suggestions", response_model=SceneSuggestionsResponse)
 async def get_scene_suggestions(
-    product_category: Optional[str] = Query(None, description="Product category for suggestions"),
+    product_id: Optional[str] = Query(None, description="Product ID to base suggestions on"),
+    product_category: Optional[str] = Query(None, description="Override category for suggestions"),
+    brand_id: Optional[str] = Query(None, description="Optional brand to align with"),
+    limit: int = Query(6, ge=3, le=12),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Get AI-suggested scenes based on product category.
+    Context-aware scene suggestions using product analysis + brand mood.
 
-    Returns templates sorted by relevance for the product type.
+    - Reads product attributes (category, primary_color, style)
+    - Blends brand mood/style/industry if provided
+    - Adds trending and seasonal signals
     """
-    # Category to scene mapping
-    category_mapping = {
-        "electronics": ["lifestyle-desk", "studio-white", "premium-dark", "ecommerce-amazon"],
-        "beauty": ["lifestyle-bathroom", "premium-marble", "studio-gradient", "social-instagram"],
-        "food": ["lifestyle-kitchen", "lifestyle-cafe", "outdoor-nature", "ecommerce-flat-lay"],
-        "fashion": ["outdoor-urban", "studio-colored", "social-instagram", "premium-velvet"],
-        "home": ["lifestyle-living-room", "lifestyle-bedroom", "studio-white", "social-pinterest"],
-        "fitness": ["outdoor-nature", "studio-white", "outdoor-urban", "lifestyle-desk"],
-        "jewelry": ["premium-velvet", "premium-marble", "premium-dark", "studio-white"],
-        "tech": ["lifestyle-desk", "studio-gray", "premium-dark", "ecommerce-amazon"],
-    }
+    attributes = {}
+    brand_context = {}
 
-    # Get suggested template IDs
-    suggested_ids = category_mapping.get(
-        product_category,
-        ["studio-white", "lifestyle-desk", "ecommerce-amazon", "social-instagram"]
+    # Load product context when provided
+    if product_id:
+        product_result = await db.execute(select(Product).where(Product.id == product_id))
+        product = product_result.scalar_one_or_none()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        if product.attributes:
+            attributes = product.attributes
+        if product.category and not product_category:
+            product_category = product.category
+
+    # Load brand context
+    if brand_id:
+        brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
+        brand = brand_result.scalar_one_or_none()
+        if not brand:
+            raise HTTPException(status_code=404, detail="Brand not found")
+
+        brand_context = {
+            "mood": brand.mood,
+            "style": brand.style,
+            "industry": brand.industry,
+            "preferred_lighting": brand.preferred_lighting,
+            "suggested_scenes": brand.suggested_scenes or [],
+        }
+
+    raw_suggestions = build_scene_suggestions(
+        product_category=product_category,
+        attributes=attributes,
+        brand_context=brand_context,
+        limit=limit,
     )
 
-    suggestions = []
-    for i, template_id in enumerate(suggested_ids):
-        template = get_template(template_id)
-        if template:
-            suggestions.append({
-                "template": SceneTemplateResponse.from_template(template),
-                "relevance": round(1.0 - (i * 0.15), 2),
-                "reason": _get_suggestion_reason(template, product_category),
-            })
+    suggestions = [
+        SceneSuggestionItem(
+            template=SceneTemplateResponse.from_template(item["template"]),
+            relevance=item["relevance"],
+            reasons=[SceneSuggestionReason(**reason) for reason in item.get("reasons", [])],
+            trending=item.get("trending", False),
+            seasonal=item.get("seasonal"),
+            feedback_token=item.get("feedback_token", f"{item['template'].id}:{product_category or 'general'}"),
+        )
+        for item in raw_suggestions
+    ]
 
-    return {
-        "product_category": product_category,
-        "suggestions": suggestions,
-    }
+    # Seasonal context derived from any seasonal match
+    seasonal_context = next((item.get("seasonal") for item in raw_suggestions if item.get("seasonal")), None)
+
+    return SceneSuggestionsResponse(
+        product_category=product_category,
+        product_attributes=attributes,
+        brand_context=brand_context,
+        suggestions=suggestions,
+        seasonal_context=seasonal_context,
+    )
 
 
-def _get_suggestion_reason(template: SceneTemplate, product_category: Optional[str]) -> str:
-    """Generate a reason for the suggestion."""
-    reasons = {
-        "studio-white": "Clean background ideal for product listings",
-        "studio-gray": "Neutral backdrop that complements any product",
-        "lifestyle-desk": "Shows product in a relatable workspace context",
-        "lifestyle-kitchen": "Perfect context for food and kitchen items",
-        "lifestyle-bathroom": "Ideal setting for beauty and self-care products",
-        "lifestyle-bedroom": "Cozy atmosphere for home and wellness products",
-        "lifestyle-cafe": "Trendy setting for food and lifestyle brands",
-        "outdoor-nature": "Natural setting for eco-conscious products",
-        "outdoor-urban": "Edgy backdrop for fashion and streetwear",
-        "premium-dark": "Dramatic lighting for luxury appeal",
-        "premium-marble": "Elegant surface for premium positioning",
-        "premium-velvet": "Luxurious texture for jewelry and accessories",
-        "ecommerce-amazon": "Meets marketplace image requirements",
-        "ecommerce-flat-lay": "Perfect for social media and catalogs",
-        "social-instagram": "Optimized for social media engagement",
-        "social-pinterest": "Designed for high save rates",
-    }
-    return reasons.get(template.id, f"Great match for {product_category or 'your'} products")
+@router.post("/suggestions/feedback")
+async def submit_suggestion_feedback(feedback: SuggestionFeedbackRequest):
+    """
+    Capture quick feedback to refine suggestions over time.
+
+    Currently persisted in logs; can be wired to analytics later.
+    """
+    logger.info(
+        "Scene suggestion feedback",
+        extra={
+            "token": feedback.feedback_token,
+            "scene_id": feedback.scene_id,
+            "helpful": feedback.helpful,
+            "product_id": feedback.product_id,
+            "brand_id": feedback.brand_id,
+            "notes": feedback.notes,
+        },
+    )
+    return {"message": "Feedback captured", "scene_id": feedback.scene_id, "helpful": feedback.helpful}

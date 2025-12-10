@@ -34,9 +34,9 @@ class GeminiClient:
 
     async def analyze_product(self, image: Image.Image) -> dict:
         """
-        Analyze a product image to detect category and attributes.
+        Analyze a product image to detect category and rich attributes.
 
-        Returns dict with: category, attributes, suggested_scenes
+        Returns dict with: category, attributes, target_audience, suggested_scenes
         """
         if not self._configured:
             return self._default_analysis()
@@ -44,16 +44,22 @@ class GeminiClient:
         try:
             prompt = """Analyze this product image and respond with ONLY valid JSON (no markdown):
 {
-    "category": "one of: electronics, beauty, food, fashion, home, fitness, other",
+    "category": "one of: electronics/tech, beauty/skincare, food/beverage, fashion/apparel, home/furniture, sports/fitness, other",
     "attributes": {
-        "primary_color": "main color",
+        "primary_color": "dominant color",
+        "secondary_color": "secondary color if visible",
         "material": "apparent material",
-        "style": "modern/classic/minimal/other"
+        "finish": "matte/glossy/metallic/soft-touch/etc",
+        "style": "modern/minimal/classic/premium/industrial",
+        "size": "small/medium/large and a short description",
+        "key_details": ["notable visible traits like 'sleek edges', 'pump dispenser'"]
     },
-    "suggested_scenes": ["scene1", "scene2", "scene3"]
+    "target_audience": "short phrase about typical user (e.g., 'young professionals', 'outdoor athletes')",
+    "usage_context": "where or how this product is typically used",
+    "suggested_scenes": ["scene_id_1", "scene_id_2", "scene_id_3"]
 }
 
-For suggested_scenes, choose from: studio-white, lifestyle-desk, lifestyle-kitchen, outdoor-nature, premium-marble"""
+For suggested_scenes, choose from: studio-white, studio-gray, lifestyle-desk, lifestyle-kitchen, lifestyle-bathroom, outdoor-nature, premium-marble, premium-dark, ecommerce-amazon, social-instagram"""
 
             response = self.model.generate_content([prompt, image])
 
@@ -283,9 +289,15 @@ Common refinement types:
             "category": "other",
             "attributes": {
                 "primary_color": "unknown",
+                "secondary_color": None,
                 "material": "unknown",
-                "style": "modern"
+                "finish": "matte",
+                "style": "modern",
+                "size": "medium",
+                "key_details": ["clean silhouette"]
             },
+            "target_audience": "general consumers",
+            "usage_context": "general product photography",
             "suggested_scenes": ["studio-white", "lifestyle-desk", "premium-marble"]
         }
 

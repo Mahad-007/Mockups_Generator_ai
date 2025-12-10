@@ -9,6 +9,7 @@ import BrandSelector from "@/components/generation/BrandSelector";
 import ChatInterface from "@/components/chat/ChatInterface";
 import ExportModal from "@/components/export/ExportModal";
 import BatchGenerator from "@/components/generation/BatchGenerator";
+import { SceneSuggestions } from "@/components/generation/SceneSuggestions";
 import { mockupsApi, ProductResponse, MockupResponse, CustomizationOptions, MockupVariation } from "@/lib/api";
 
 type Step = "upload" | "scene" | "generate" | "result";
@@ -201,6 +202,13 @@ export default function GeneratePage() {
                 onSelect={setSelectedBrandId}
               />
             </div>
+
+            <SceneSuggestions
+              product={product}
+              brandId={selectedBrandId}
+              selectedScene={selectedScene}
+              onSelect={handleSceneSelect}
+            />
 
             <SceneSelector
               selectedScene={selectedScene}

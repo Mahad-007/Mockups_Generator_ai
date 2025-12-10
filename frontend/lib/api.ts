@@ -110,10 +110,27 @@ export const scenesApi = {
       body: JSON.stringify(data),
     }),
 
-  getSuggestions: (productCategory?: string) => {
-    const params = productCategory ? `?product_category=${productCategory}` : "";
-    return request<SceneSuggestionsResponse>(`/scenes/suggestions${params}`);
+  getSuggestions: (params?: {
+    product_id?: string;
+    product_category?: string;
+    brand_id?: string;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.product_id) searchParams.set("product_id", params.product_id);
+    if (params?.product_category) searchParams.set("product_category", params.product_category);
+    if (params?.brand_id) searchParams.set("brand_id", params.brand_id);
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const queryString = searchParams.toString();
+    return request<SceneSuggestionsResponse>(`/scenes/suggestions${queryString ? `?${queryString}` : ""}`);
   },
+
+  sendSuggestionFeedback: (data: SceneSuggestionFeedback) =>
+    request<{ message: string; scene_id: string; helpful: boolean }>("/scenes/suggestions/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
 };
 
 // Types
@@ -188,12 +205,30 @@ export interface CustomizeResponse {
 export interface SceneSuggestion {
   template: SceneTemplate;
   relevance: number;
-  reason: string;
+  reasons: Array<{
+    label: string;
+    detail: string;
+  }>;
+  trending: boolean;
+  seasonal?: string | null;
+  feedback_token: string;
 }
 
 export interface SceneSuggestionsResponse {
   product_category: string | null;
+  product_attributes: Record<string, unknown>;
+  brand_context: Record<string, unknown>;
+  seasonal_context?: string | null;
   suggestions: SceneSuggestion[];
+}
+
+export interface SceneSuggestionFeedback {
+  feedback_token: string;
+  scene_id: string;
+  helpful: boolean;
+  product_id?: string;
+  brand_id?: string;
+  notes?: string;
 }
 
 // Chat Types

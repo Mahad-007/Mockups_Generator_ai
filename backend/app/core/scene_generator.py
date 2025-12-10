@@ -1,7 +1,8 @@
 """Scene templates and generation logic."""
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from datetime import datetime
 
 
 class SceneCategory(str, Enum):
@@ -473,3 +474,269 @@ def build_customized_prompt(template_id: str, customizations: Dict) -> str:
         prompt += f", {customizations['angle']} camera angle"
 
     return prompt
+
+
+# ---------- Context-aware suggestions (Phase 6) ----------
+
+# Category-driven starter sets
+CATEGORY_PRIORITIES: Dict[str, List[str]] = {
+    "electronics": ["lifestyle-desk", "studio-gray", "premium-dark", "ecommerce-amazon", "social-instagram"],
+    "tech": ["lifestyle-desk", "studio-gray", "premium-dark", "ecommerce-amazon"],
+    "beauty": ["lifestyle-bathroom", "premium-marble", "social-instagram", "studio-gradient"],
+    "beauty/skincare": ["lifestyle-bathroom", "premium-marble", "social-instagram", "studio-gradient"],
+    "food": ["lifestyle-kitchen", "lifestyle-cafe", "outdoor-nature", "ecommerce-flat-lay"],
+    "food/beverage": ["lifestyle-kitchen", "lifestyle-cafe", "outdoor-nature", "ecommerce-flat-lay"],
+    "fashion": ["outdoor-urban", "studio-colored", "social-instagram", "premium-dark"],
+    "fashion/apparel": ["outdoor-urban", "studio-colored", "social-instagram"],
+    "home": ["lifestyle-living-room", "lifestyle-bedroom", "studio-white", "social-pinterest"],
+    "home/furniture": ["lifestyle-living-room", "lifestyle-bedroom", "studio-white"],
+    "fitness": ["outdoor-nature", "studio-white", "outdoor-urban", "lifestyle-desk"],
+    "sports/fitness": ["outdoor-nature", "studio-white", "outdoor-urban"],
+    "other": ["studio-white", "lifestyle-desk", "ecommerce-amazon", "social-instagram"],
+}
+
+# Style and mood driven helpers
+STYLE_SCENE_MAP: Dict[str, List[str]] = {
+    "premium": ["premium-marble", "premium-dark", "premium-velvet"],
+    "luxury": ["premium-marble", "premium-dark", "premium-velvet"],
+    "minimal": ["studio-white", "studio-gray", "lifestyle-desk"],
+    "modern": ["studio-gradient", "studio-colored", "lifestyle-desk"],
+    "classic": ["studio-textured", "premium-marble"],
+    "playful": ["studio-colored", "social-instagram", "outdoor-nature"],
+}
+
+# Color harmony nudges
+COLOR_SCENE_MAP: Dict[str, List[str]] = {
+    "dark": ["studio-white", "studio-gradient", "premium-marble"],
+    "light": ["premium-dark", "studio-gradient"],
+    "warm": ["studio-colored", "seasonal-autumn", "seasonal-summer"],
+    "cool": ["studio-gray", "outdoor-nature", "studio-gradient"],
+}
+
+# Trending/seasonal awareness
+TRENDING_BY_CATEGORY: Dict[str, List[str]] = {
+    "electronics": ["lifestyle-desk", "premium-dark"],
+    "beauty": ["lifestyle-bathroom", "premium-marble"],
+    "food": ["lifestyle-kitchen", "ecommerce-flat-lay"],
+    "fashion": ["outdoor-urban", "studio-colored"],
+    "home": ["lifestyle-living-room", "social-pinterest"],
+    "fitness": ["outdoor-nature", "studio-white"],
+}
+
+SEASONAL_SCENES: Dict[str, List[str]] = {
+    "winter": ["seasonal-winter", "premium-dark"],
+    "spring": ["seasonal-spring", "outdoor-garden"],
+    "summer": ["seasonal-summer", "outdoor-beach"],
+    "autumn": ["seasonal-autumn", "studio-textured"],
+}
+
+DEFAULT_SCENES = ["studio-white", "lifestyle-desk", "ecommerce-amazon", "social-instagram"]
+
+
+def normalize_category(category: Optional[str]) -> str:
+    """Normalize category strings to canonical keys."""
+    if not category:
+        return "other"
+    c = category.lower()
+    aliases = {
+        "tech": "electronics",
+        "electronics/tech": "electronics",
+        "beauty/skincare": "beauty",
+        "food/beverage": "food",
+        "fashion/apparel": "fashion",
+        "home/furniture": "home",
+        "sports/fitness": "fitness",
+    }
+    return aliases.get(c, c)
+
+
+def _detect_season(now: Optional[datetime] = None) -> Optional[str]:
+    """Return current season name to influence seasonal suggestions."""
+    now = now or datetime.utcnow()
+    month = now.month
+    if month in (12, 1, 2):
+        return "winter"
+    if month in (3, 4, 5):
+        return "spring"
+    if month in (6, 7, 8):
+        return "summer"
+    if month in (9, 10, 11):
+        return "autumn"
+    return None
+
+
+def _color_profile(color: Optional[str]) -> Optional[str]:
+    if not color:
+        return None
+    color = color.lower()
+    if any(term in color for term in ["black", "charcoal", "navy", "dark"]):
+        return "dark"
+    if any(term in color for term in ["white", "cream", "beige", "silver", "light"]):
+        return "light"
+    if any(term in color for term in ["red", "orange", "yellow", "coral", "gold"]):
+        return "warm"
+    if any(term in color for term in ["blue", "teal", "green", "mint"]):
+        return "cool"
+    return None
+
+
+def _candidate_scene_ids(
+    normalized_category: str,
+    attributes: Dict,
+    brand_context: Dict,
+    season: Optional[str],
+) -> List[str]:
+    candidates = []
+
+    # Category seed
+    if normalized_category in CATEGORY_PRIORITIES:
+        candidates.extend(CATEGORY_PRIORITIES[normalized_category])
+
+    # Style/mood
+    style = (attributes.get("style") or "").lower()
+    if style and style in STYLE_SCENE_MAP:
+        candidates.extend(STYLE_SCENE_MAP[style])
+
+    mood = (brand_context.get("mood") or "").lower()
+    if mood and mood in STYLE_SCENE_MAP:
+        candidates.extend(STYLE_SCENE_MAP[mood])
+
+    # Color harmony
+    color_profile = _color_profile(attributes.get("primary_color"))
+    if color_profile and color_profile in COLOR_SCENE_MAP:
+        candidates.extend(COLOR_SCENE_MAP[color_profile])
+
+    # Brand-suggested scenes
+    brand_suggestions = brand_context.get("suggested_scenes") or []
+    candidates.extend(brand_suggestions)
+
+    # Seasonal boost
+    if season and season in SEASONAL_SCENES:
+        candidates.extend(SEASONAL_SCENES[season])
+
+    # Trending
+    if normalized_category in TRENDING_BY_CATEGORY:
+        candidates.extend(TRENDING_BY_CATEGORY[normalized_category])
+
+    # Defaults
+    candidates.extend(DEFAULT_SCENES)
+
+    # Keep order but remove duplicates
+    seen = set()
+    ordered = []
+    for cid in candidates:
+        if cid not in seen:
+            seen.add(cid)
+            ordered.append(cid)
+    return ordered
+
+
+def _score_template(
+    template: SceneTemplate,
+    normalized_category: str,
+    attributes: Dict,
+    brand_context: Dict,
+    season: Optional[str],
+    index_hint: int,
+) -> Tuple[float, List[Dict], bool, Optional[str]]:
+    """Compute a relevance score and reasons for a template."""
+    reasons: List[Dict] = []
+    score = template.popularity / 120  # base influence from curated popularity
+
+    # Category fit
+    cat_list = CATEGORY_PRIORITIES.get(normalized_category, [])
+    if template.id in cat_list:
+        cat_weight = max(0.25, 0.5 - (0.05 * cat_list.index(template.id)))
+        score += cat_weight
+        reasons.append({"label": "Category match", "detail": f"Strong fit for {normalized_category} products"})
+
+    # Attribute/style fit
+    style = (attributes.get("style") or "").lower()
+    if style and template.id in STYLE_SCENE_MAP.get(style, []):
+        score += 0.15
+        reasons.append({"label": "Style alignment", "detail": f"Matches {style} aesthetic"})
+
+    # Color harmony
+    color_profile = _color_profile(attributes.get("primary_color"))
+    if color_profile and template.id in COLOR_SCENE_MAP.get(color_profile, []):
+        score += 0.12
+        reasons.append({"label": "Color harmony", "detail": f"Balances {color_profile} colored products"})
+
+    # Brand alignment
+    brand_scenes = brand_context.get("suggested_scenes") or []
+    if template.id in brand_scenes:
+        score += 0.18
+        reasons.append({"label": "Brand alignment", "detail": "Matches brand mood/style preferences"})
+    elif brand_context.get("industry") and template.category in [SceneCategory.PREMIUM, SceneCategory.SOCIAL]:
+        score += 0.05
+
+    # Trending boost
+    trending_list = TRENDING_BY_CATEGORY.get(normalized_category, [])
+    trending = template.id in trending_list
+    if trending:
+        score += 0.1
+        reasons.append({"label": "Trending", "detail": "Popular in your product category right now"})
+
+    # Seasonal boost
+    seasonal_match = None
+    if season and template.id in SEASONAL_SCENES.get(season, []):
+        seasonal_match = season
+        score += 0.08
+        reasons.append({"label": "Seasonal", "detail": f"Works well for {season} campaigns"})
+
+    # Distance penalty to keep ordering meaningful
+    score -= min(index_hint * 0.01, 0.1)
+
+    # Normalize
+    relevance = max(0.05, min(1.0, round(score, 2)))
+    return relevance, reasons, trending, seasonal_match
+
+
+def build_scene_suggestions(
+    product_category: Optional[str],
+    attributes: Optional[Dict] = None,
+    brand_context: Optional[Dict] = None,
+    limit: int = 6,
+) -> List[Dict]:
+    """
+    Build ranked scene suggestions using product + brand context.
+    """
+    attributes = attributes or {}
+    brand_context = brand_context or {}
+    normalized_category = normalize_category(product_category or attributes.get("category"))
+    season = _detect_season()
+
+    candidate_ids = _candidate_scene_ids(normalized_category, attributes, brand_context, season)
+
+    suggestions = []
+    for idx, scene_id in enumerate(candidate_ids):
+        template = get_template(scene_id)
+        if not template:
+            continue
+
+        relevance, reasons, trending, seasonal_match = _score_template(
+            template,
+            normalized_category,
+            attributes,
+            brand_context,
+            season,
+            idx,
+        )
+
+        suggestions.append({
+            "template": template,
+            "relevance": relevance,
+            "reasons": reasons,
+            "trending": trending,
+            "seasonal": seasonal_match,
+            "feedback_token": f"{scene_id}:{normalized_category}",
+        })
+
+    # Sort by relevance then popularity
+    suggestions = sorted(
+        suggestions,
+        key=lambda s: (s["relevance"], s["template"].popularity),
+        reverse=True,
+    )
+
+    return suggestions[:limit]

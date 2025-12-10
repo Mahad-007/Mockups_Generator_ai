@@ -710,7 +710,11 @@ docker-compose down           # Stop all services
   - BrandSelector component in generation flow
   - Default brand auto-selection
   - Brand styling indicators in generated mockups
-- [ ] Phase 6: Context-Aware Suggestions
+- [x] Phase 6: Context-Aware Suggestions
+  - Enhanced Gemini product analysis (attributes, audience, usage context)
+  - Contextual scene recommender blending product + brand + trending + seasonal signals
+  - Scene suggestions API with relevance scoring and feedback capture
+  - Frontend AI suggestion rail with reasons, badges, and quick-select
 - [ ] Phase 7: Smart Compositing
 - [ ] Phase 8: User System
 - [ ] Phase 9: Canvas Editor
