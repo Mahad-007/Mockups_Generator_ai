@@ -75,13 +75,45 @@ export const mockupsApi = {
 
 // Scenes API
 export const scenesApi = {
-  getTemplates: (category?: string) => {
-    const params = category ? `?category=${category}` : "";
-    return request<{ templates: SceneTemplate[] }>(`/scenes/templates${params}`);
+  getTemplates: (params?: {
+    category?: string;
+    search?: string;
+    tags?: string;
+    premium_only?: boolean;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.set("category", params.category);
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.tags) searchParams.set("tags", params.tags);
+    if (params?.premium_only) searchParams.set("premium_only", "true");
+    if (params?.limit) searchParams.set("limit", params.limit.toString());
+    const queryString = searchParams.toString();
+    return request<{ templates: SceneTemplate[]; total: number }>(
+      `/scenes/templates${queryString ? `?${queryString}` : ""}`
+    );
   },
 
+  getTemplate: (id: string) =>
+    request<SceneTemplate>(`/scenes/templates/${id}`),
+
   getCategories: () =>
-    request<{ categories: string[] }>("/scenes/categories"),
+    request<{ categories: string[]; counts: Record<string, number> }>("/scenes/categories"),
+
+  getTags: () =>
+    request<{ tags: Array<{ name: string; count: number }> }>("/scenes/tags"),
+
+  customize: (data: CustomizeRequest) =>
+    request<CustomizeResponse>("/scenes/customize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+
+  getSuggestions: (productCategory?: string) => {
+    const params = productCategory ? `?product_category=${productCategory}` : "";
+    return request<SceneSuggestionsResponse>(`/scenes/suggestions${params}`);
+  },
 };
 
 // Types
@@ -94,10 +126,18 @@ export interface ProductResponse {
   created_at: string;
 }
 
+export interface CustomizationOptions {
+  color?: string;
+  surface?: string;
+  lighting?: string;
+  angle?: string;
+}
+
 export interface MockupGenerateRequest {
   product_id: string;
   scene_template_id?: string;
   custom_prompt?: string;
+  customization?: CustomizationOptions;
 }
 
 export interface MockupResponse {
@@ -109,9 +149,46 @@ export interface MockupResponse {
   created_at: string;
 }
 
+export interface SceneCustomizationOptions {
+  colors: string[];
+  surfaces: string[];
+  lighting: string[];
+  angles: string[];
+}
+
 export interface SceneTemplate {
   id: string;
   name: string;
   category: string;
+  description: string;
   tags: string[];
+  is_premium: boolean;
+  popularity: number;
+  customization: SceneCustomizationOptions;
+}
+
+export interface CustomizeRequest {
+  template_id: string;
+  color?: string;
+  surface?: string;
+  lighting?: string;
+  angle?: string;
+}
+
+export interface CustomizeResponse {
+  template_id: string;
+  original_prompt: string;
+  customized_prompt: string;
+  customizations_applied: Record<string, string>;
+}
+
+export interface SceneSuggestion {
+  template: SceneTemplate;
+  relevance: number;
+  reason: string;
+}
+
+export interface SceneSuggestionsResponse {
+  product_category: string | null;
+  suggestions: SceneSuggestion[];
 }

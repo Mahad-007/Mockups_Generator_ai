@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.storage import get_image, save_image
 from app.core.gemini import gemini_client
-from app.core.scene_generator import SCENE_TEMPLATES
+from app.core.scene_generator import get_template, build_customized_prompt
 from app.core.utils import get_image_url
 from app.models import Product, Mockup
 from app.schemas import MockupGenerateRequest, MockupResponse
@@ -23,6 +23,7 @@ async def generate_mockup(
     Generate a mockup for a product.
 
     - Takes product ID and scene template
+    - Supports customization (color, surface, lighting, angle)
     - Uses AI to generate the mockup
     - Saves and returns the result
     """
@@ -33,9 +34,24 @@ async def generate_mockup(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Get scene prompt
-    scene_template = SCENE_TEMPLATES.get(request.scene_template_id, SCENE_TEMPLATES["studio-white"])
-    scene_prompt = request.custom_prompt or scene_template["prompt"]
+    # Get scene template
+    template = get_template(request.scene_template_id or "studio-white")
+    if not template:
+        template = get_template("studio-white")
+
+    # Build prompt with customizations
+    if request.custom_prompt:
+        scene_prompt = request.custom_prompt
+    elif request.customization:
+        customizations = {
+            "color": request.customization.color,
+            "surface": request.customization.surface,
+            "lighting": request.customization.lighting,
+            "angle": request.customization.angle,
+        }
+        scene_prompt = build_customized_prompt(template.id, customizations)
+    else:
+        scene_prompt = template.prompt
 
     # Load product image (use processed if available)
     image_path = product.processed_image_path or product.original_image_path
@@ -56,16 +72,21 @@ async def generate_mockup(
     # Save mockup
     mockup_path = save_image(mockup_image, "mockups")
 
+    # Build generation params for storage
+    generation_params = {
+        "scene_template": request.scene_template_id,
+        "custom_prompt": request.custom_prompt,
+    }
+    if request.customization:
+        generation_params["customization"] = request.customization.model_dump()
+
     # Create database record
     mockup = Mockup(
         product_id=product.id,
         image_path=mockup_path,
         scene_template_id=request.scene_template_id,
         prompt_used=scene_prompt,
-        generation_params={
-            "scene_template": request.scene_template_id,
-            "custom_prompt": request.custom_prompt,
-        },
+        generation_params=generation_params,
     )
     db.add(mockup)
     await db.flush()

@@ -4,11 +4,20 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 
+class CustomizationOptions(BaseModel):
+    """Scene customization options."""
+    color: Optional[str] = None
+    surface: Optional[str] = None
+    lighting: Optional[str] = None
+    angle: Optional[str] = None
+
+
 class MockupGenerateRequest(BaseModel):
     """Request schema for generating a mockup."""
     product_id: str
     scene_template_id: Optional[str] = "studio-white"
     custom_prompt: Optional[str] = None
+    customization: Optional[CustomizationOptions] = None
 
 
 class MockupResponse(BaseModel):

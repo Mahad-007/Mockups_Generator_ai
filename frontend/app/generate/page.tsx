@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Upload, Sparkles, Download, ArrowLeft, AlertCircle } from "lucide-react";
 import ProductUploader from "@/components/upload/ProductUploader";
 import SceneSelector from "@/components/generation/SceneSelector";
-import { mockupsApi, ProductResponse, MockupResponse } from "@/lib/api";
+import { mockupsApi, ProductResponse, MockupResponse, CustomizationOptions } from "@/lib/api";
 
 type Step = "upload" | "scene" | "generate" | "result";
 
@@ -13,6 +13,7 @@ export default function GeneratePage() {
   const [currentStep, setCurrentStep] = useState<Step>("upload");
   const [product, setProduct] = useState<ProductResponse | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
+  const [customization, setCustomization] = useState<CustomizationOptions | undefined>(undefined);
   const [mockup, setMockup] = useState<MockupResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +23,9 @@ export default function GeneratePage() {
     setCurrentStep("scene");
   };
 
-  const handleSceneSelect = (sceneId: string) => {
+  const handleSceneSelect = (sceneId: string, options?: CustomizationOptions) => {
     setSelectedScene(sceneId);
+    setCustomization(options);
   };
 
   const handleGenerate = async () => {
@@ -37,6 +39,7 @@ export default function GeneratePage() {
       const result = await mockupsApi.generate({
         product_id: product.id,
         scene_template_id: selectedScene,
+        customization,
       });
       setMockup(result);
       setCurrentStep("result");
@@ -52,6 +55,7 @@ export default function GeneratePage() {
   const handleStartOver = () => {
     setProduct(null);
     setSelectedScene(null);
+    setCustomization(undefined);
     setMockup(null);
     setError(null);
     setCurrentStep("upload");
