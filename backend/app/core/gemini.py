@@ -168,6 +168,115 @@ Generate the final mockup image."""
             logger.error(f"Mockup generation failed: {e}")
             return None
 
+    async def refine_mockup(
+        self,
+        current_image: Image.Image,
+        refinement_instruction: str,
+        conversation_history: Optional[list] = None,
+    ) -> Optional[Image.Image]:
+        """
+        Refine an existing mockup based on user instructions.
+
+        This enables conversational refinement where users can iteratively
+        improve their mockups through natural language.
+        """
+        if not self._configured:
+            return None
+
+        try:
+            # Build context from conversation history
+            context = ""
+            if conversation_history:
+                context = "Previous refinements:\n"
+                for msg in conversation_history[-5:]:  # Last 5 messages for context
+                    context += f"- {msg['role']}: {msg['content']}\n"
+                context += "\n"
+
+            prompt = f"""{context}Refine this product mockup image based on the following instruction:
+
+Instruction: {refinement_instruction}
+
+Requirements:
+- Apply the requested changes while maintaining the product's integrity
+- Keep the professional photography quality
+- Preserve product details and proportions
+- Make the changes look natural and realistic
+- If the instruction is unclear, make reasonable assumptions
+
+Generate the refined mockup image."""
+
+            response = self.model.generate_content(
+                [prompt, current_image],
+                generation_config=types.GenerationConfig(
+                    response_mime_type="image/png",
+                )
+            )
+
+            # Extract image from response
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        image_data = part.inline_data.data
+                        return Image.open(io.BytesIO(image_data))
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Mockup refinement failed: {e}")
+            return None
+
+    async def parse_refinement_intent(
+        self,
+        user_message: str,
+    ) -> dict:
+        """
+        Parse user's refinement message to understand intent.
+
+        Returns structured information about what changes to make.
+        """
+        if not self._configured:
+            return {"type": "unknown", "description": user_message}
+
+        try:
+            prompt = f"""Analyze this mockup refinement request and respond with ONLY valid JSON:
+
+User request: "{user_message}"
+
+Respond with JSON in this format:
+{{
+    "type": "one of: lighting, color, background, surface, style, position, add_element, remove_element, other",
+    "description": "brief description of the change",
+    "specific_params": {{
+        "key details about the requested change"
+    }},
+    "confidence": 0.0-1.0
+}}
+
+Common refinement types:
+- lighting: brightness, warmth, shadows, direction
+- color: temperature, saturation, specific colors
+- background: blur, change, gradient
+- surface: material changes (wood, marble, fabric)
+- style: minimal, dramatic, cozy, professional
+- position: center, angle, zoom
+- add_element: props, decorations
+- remove_element: remove items"""
+
+            response = self.model.generate_content(prompt)
+            text = response.text.strip()
+
+            # Remove markdown code blocks if present
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+
+            return json.loads(text)
+
+        except Exception as e:
+            logger.error(f"Intent parsing failed: {e}")
+            return {"type": "other", "description": user_message, "confidence": 0.5}
+
     def _default_analysis(self) -> dict:
         """Return default analysis when API is unavailable."""
         return {

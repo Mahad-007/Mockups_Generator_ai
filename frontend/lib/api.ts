@@ -192,3 +192,59 @@ export interface SceneSuggestionsResponse {
   product_category: string | null;
   suggestions: SceneSuggestion[];
 }
+
+// Chat Types
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  image_url: string | null;
+  refinement_type: string | null;
+  created_at: string;
+}
+
+export interface ChatSession {
+  id: string;
+  mockup_id: string;
+  current_image_url: string;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RefinementSuggestion {
+  label: string;
+  prompt: string;
+  category: string;
+}
+
+// Chat API
+export const chatApi = {
+  createSession: (mockupId: string) =>
+    request<ChatSession>("/chat/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mockup_id: mockupId }),
+    }),
+
+  getSession: (sessionId: string) =>
+    request<ChatSession>(`/chat/sessions/${sessionId}`),
+
+  sendMessage: (sessionId: string, content: string) =>
+    request<ChatMessage>(`/chat/sessions/${sessionId}/message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    }),
+
+  undo: (sessionId: string) =>
+    request<ChatMessage>(`/chat/sessions/${sessionId}/undo`),
+
+  getSuggestions: () =>
+    request<{ suggestions: RefinementSuggestion[] }>("/chat/suggestions"),
+
+  listSessions: (mockupId?: string) => {
+    const params = mockupId ? `?mockup_id=${mockupId}` : "";
+    return request<ChatSession[]>(`/chat/sessions${params}`);
+  },
+};

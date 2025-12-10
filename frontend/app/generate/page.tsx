@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Upload, Sparkles, Download, ArrowLeft, AlertCircle } from "lucide-react";
+import { Upload, Sparkles, Download, ArrowLeft, AlertCircle, MessageSquare } from "lucide-react";
 import ProductUploader from "@/components/upload/ProductUploader";
 import SceneSelector from "@/components/generation/SceneSelector";
+import ChatInterface from "@/components/chat/ChatInterface";
 import { mockupsApi, ProductResponse, MockupResponse, CustomizationOptions } from "@/lib/api";
 
 type Step = "upload" | "scene" | "generate" | "result";
@@ -17,6 +18,8 @@ export default function GeneratePage() {
   const [mockup, setMockup] = useState<MockupResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRefinement, setShowRefinement] = useState(false);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
 
   const handleProductUpload = (uploadedProduct: ProductResponse) => {
     setProduct(uploadedProduct);
@@ -58,6 +61,8 @@ export default function GeneratePage() {
     setCustomization(undefined);
     setMockup(null);
     setError(null);
+    setShowRefinement(false);
+    setCurrentImageUrl(null);
     setCurrentStep("upload");
   };
 
@@ -179,46 +184,71 @@ export default function GeneratePage() {
         )}
 
         {currentStep === "result" && mockup && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <h1 className="text-2xl font-bold mb-6 text-center">
               Your Mockup is Ready!
             </h1>
 
-            <div className="bg-white rounded-xl border overflow-hidden">
-              <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                <img
-                  src={mockup.image_url}
-                  alt="Generated mockup"
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
+            <div className={`grid gap-6 ${showRefinement ? "lg:grid-cols-2" : ""}`}>
+              {/* Mockup Display */}
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="aspect-video bg-gray-100 flex items-center justify-center">
+                  <img
+                    src={currentImageUrl || mockup.image_url}
+                    alt="Generated mockup"
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
 
-              <div className="p-6 border-t">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Scene: {mockup.scene_template_id}</p>
-                    <p className="text-xs text-gray-400">
-                      Generated {new Date(mockup.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <a
-                      href={mockup.image_url}
-                      download={`mockup-${mockup.id}.png`}
-                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </a>
-                    <button
-                      onClick={handleStartOver}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                    >
-                      Create Another
-                    </button>
+                <div className="p-6 border-t">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Scene: {mockup.scene_template_id}</p>
+                      <p className="text-xs text-gray-400">
+                        Generated {new Date(mockup.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setShowRefinement(!showRefinement)}
+                        className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                          showRefinement
+                            ? "bg-gray-200 text-gray-700"
+                            : "bg-purple-600 text-white hover:bg-purple-700"
+                        }`}
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        {showRefinement ? "Hide Refinement" : "Refine with AI"}
+                      </button>
+                      <a
+                        href={currentImageUrl || mockup.image_url}
+                        download={`mockup-${mockup.id}.png`}
+                        className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </a>
+                      <button
+                        onClick={handleStartOver}
+                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                      >
+                        Create Another
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* Chat Interface */}
+              {showRefinement && (
+                <div className="lg:h-[600px]">
+                  <ChatInterface
+                    mockupId={mockup.id}
+                    initialImageUrl={mockup.image_url}
+                    onImageUpdate={setCurrentImageUrl}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
