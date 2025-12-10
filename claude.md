@@ -664,8 +664,23 @@ docker-compose down           # Stop all services
   - 20 scene templates
   - Local file storage
   - Frontend generation flow
-- [ ] Phase 2: Scene Library
-- [ ] Phase 3: Conversational AI
+- [x] Phase 2: Scene Library (Completed)
+  - 25+ scene templates across 7 categories
+  - Rich metadata with customization options
+  - Scene search and filtering
+  - Tag-based filtering
+  - Scene suggestions by product category
+  - Favorites feature with localStorage
+  - Customization panel (colors, surfaces, lighting, angles)
+- [x] Phase 3: Conversational AI (Completed)
+  - ChatSession and ChatMessage models
+  - Chat API endpoints for refinement
+  - Gemini-powered mockup refinement
+  - Intent parsing for refinement requests
+  - 12 pre-defined refinement suggestions
+  - Undo functionality
+  - Real-time image updates
+  - Integrated chat panel in generation flow
 - [ ] Phase 4: Batch & Export
 - [ ] Phase 5: Brand Features
 - [ ] Phase 6: Context-Aware Suggestions
