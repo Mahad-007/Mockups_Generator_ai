@@ -719,8 +719,24 @@ docker-compose down           # Stop all services
   - Rembg matting refinements for glass/reflective products with shadow rescue
   - Lighting-aware compositor with auto scaling/anchoring, reflections, DOF, and polish
   - Gemini scene generation + smart compositing pipeline with AI-direct fallback
-- [ ] Phase 8: User System
-- [ ] Phase 9: Canvas Editor
+- [x] Phase 8: User System
+  - Credentials auth with JWT (access/refresh), rate limits, and protected routes
+  - User model upgrades (tiers, usage counters, verification/reset tokens), Alembic migration
+  - Usage limits + `/users/me/usage` with tiered guardrails on generation/export/brands
+  - Teams stub (models + API) gated to Agency tier with placeholder invites
+  - NextAuth credentials integration (login/register), middleware-protected UI, dashboard with usage/tier cards
+- [x] Phase 9: Canvas Editor (Completed)
+  - Fabric.js canvas integration with full editor capabilities
+  - CanvasEditor component with image loading and manipulation
+  - ToolBar with editing tools (text, shapes, zoom, pan)
+  - LayerPanel for layer management (visibility, locking, reordering)
+  - AdjustmentPanel for image filters (brightness, contrast, saturation, blur, opacity)
+  - Undo/redo functionality with canvas history
+  - Auto-save drafts to database every 30 seconds
+  - Keyboard shortcuts (Ctrl+Z/Y, Delete, Ctrl+S)
+  - Editor page at /editor/[id] with full layout
+  - Backend API for updating mockups with canvas_data
+  - Database migration for canvas_data JSON field
 - [ ] Phase 10: API & Integrations
 
 ---

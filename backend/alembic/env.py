@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.models.base import Base
-from app.models import User, Product, Mockup, Brand, SceneTemplate
+from app.models import User, Product, Mockup, Brand, SceneTemplate, Team, TeamMembership
 from app.config import settings
 
 config = context.config
@@ -17,7 +17,10 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def get_url():
-    return settings.database_url.replace("+asyncpg", "")
+    # Support async drivers by stripping driver suffixes for Alembic
+    return (
+        settings.database_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+    )
 
 def run_migrations_offline() -> None:
     url = get_url()

@@ -1,9 +1,25 @@
 """API v1 router - all endpoints."""
 from fastapi import APIRouter
 
-from app.api.v1 import products, mockups, scenes, chat, exports, batch, brands
+from app.api.v1 import (
+    products,
+    mockups,
+    scenes,
+    chat,
+    exports,
+    batch,
+    brands,
+    auth,
+    users,
+    teams,
+)
 
 api_router = APIRouter()
+
+# Auth / Users
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(teams.router, prefix="/teams", tags=["teams"])
 
 # Core endpoints
 api_router.include_router(products.router, prefix="/products", tags=["products"])

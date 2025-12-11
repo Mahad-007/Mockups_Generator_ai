@@ -4,14 +4,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
 
+from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.storage import get_image, save_image
 from app.core.gemini import gemini_client
 from app.core.compositor import compositor
 from app.core.scene_generator import get_template, build_customized_prompt
 from app.core.utils import get_image_url
-from app.models import Product, Mockup, Brand
-from app.schemas import MockupGenerateRequest, MockupResponse
+from app.models import Product, Mockup, Brand, User
+from app.schemas import MockupGenerateRequest, MockupResponse, MockupUpdateRequest
+from app.services.usage_service import ensure_within_limits
 
 router = APIRouter()
 
@@ -76,6 +78,7 @@ def _enhance_prompt_with_brand(base_prompt: str, brand: Brand) -> tuple[str, dic
 async def generate_mockup(
     request: MockupGenerateRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Generate a mockup for a product.
@@ -87,7 +90,12 @@ async def generate_mockup(
     - Saves and returns the result
     """
     # Get product
-    result = await db.execute(select(Product).where(Product.id == request.product_id))
+    result = await db.execute(
+        select(Product).where(
+            Product.id == request.product_id,
+            Product.user_id == current_user.id,
+        )
+    )
     product = result.scalar_one_or_none()
 
     if not product:
@@ -98,7 +106,12 @@ async def generate_mockup(
     brand_applied = None
     
     if request.brand_id:
-        result = await db.execute(select(Brand).where(Brand.id == request.brand_id))
+        result = await db.execute(
+            select(Brand).where(
+                Brand.id == request.brand_id,
+                Brand.user_id == current_user.id,
+            )
+        )
         brand = result.scalar_one_or_none()
         if not brand:
             raise HTTPException(status_code=404, detail="Brand not found")
@@ -178,9 +191,13 @@ async def generate_mockup(
         generation_params["brand_name"] = brand.name
     generation_params["pipeline"] = pipeline_used
 
+    # Enforce usage limits
+    await ensure_within_limits(db, current_user, "mockups_generated", increment=1)
+
     # Create database record
     mockup = Mockup(
         product_id=product.id,
+        user_id=current_user.id,
         brand_id=brand.id if brand else None,
         image_path=mockup_path,
         scene_template_id=request.scene_template_id,
@@ -200,6 +217,7 @@ async def generate_mockup(
         prompt_used=mockup.prompt_used,
         brand_id=mockup.brand_id,
         brand_applied=mockup.brand_applied,
+        canvas_data=mockup.canvas_data,
         created_at=mockup.created_at,
     )
 
@@ -210,9 +228,15 @@ async def list_mockups(
     product_id: str = None,
     brand_id: str = None,
     limit: int = 20,
+    current_user: User = Depends(get_current_active_user),
 ):
     """List mockups, optionally filtered by product or brand."""
-    query = select(Mockup).order_by(Mockup.created_at.desc()).limit(limit)
+    query = (
+        select(Mockup)
+        .where(Mockup.user_id == current_user.id)
+        .order_by(Mockup.created_at.desc())
+        .limit(limit)
+    )
 
     if product_id:
         query = query.where(Mockup.product_id == product_id)
@@ -231,6 +255,7 @@ async def list_mockups(
             prompt_used=m.prompt_used,
             brand_id=m.brand_id,
             brand_applied=m.brand_applied,
+            canvas_data=m.canvas_data,
             created_at=m.created_at,
         )
         for m in mockups
@@ -241,9 +266,12 @@ async def list_mockups(
 async def get_mockup(
     mockup_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get a specific mockup."""
-    result = await db.execute(select(Mockup).where(Mockup.id == mockup_id))
+    result = await db.execute(
+        select(Mockup).where(Mockup.id == mockup_id, Mockup.user_id == current_user.id)
+    )
     mockup = result.scalar_one_or_none()
 
     if not mockup:
@@ -257,6 +285,43 @@ async def get_mockup(
         prompt_used=mockup.prompt_used,
         brand_id=mockup.brand_id,
         brand_applied=mockup.brand_applied,
+        canvas_data=mockup.canvas_data,
+        created_at=mockup.created_at,
+    )
+
+
+@router.put("/{mockup_id}", response_model=MockupResponse)
+async def update_mockup(
+    mockup_id: str,
+    request: MockupUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update a mockup (e.g., save canvas editor state)."""
+    result = await db.execute(
+        select(Mockup).where(Mockup.id == mockup_id, Mockup.user_id == current_user.id)
+    )
+    mockup = result.scalar_one_or_none()
+
+    if not mockup:
+        raise HTTPException(status_code=404, detail="Mockup not found")
+
+    # Update canvas data
+    if request.canvas_data is not None:
+        mockup.canvas_data = request.canvas_data
+
+    await db.flush()
+    await db.refresh(mockup)
+
+    return MockupResponse(
+        id=mockup.id,
+        product_id=mockup.product_id,
+        image_url=get_image_url(mockup.image_path),
+        scene_template_id=mockup.scene_template_id,
+        prompt_used=mockup.prompt_used,
+        brand_id=mockup.brand_id,
+        brand_applied=mockup.brand_applied,
+        canvas_data=mockup.canvas_data,
         created_at=mockup.created_at,
     )
 
@@ -265,9 +330,12 @@ async def get_mockup(
 async def delete_mockup(
     mockup_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete a mockup."""
-    result = await db.execute(select(Mockup).where(Mockup.id == mockup_id))
+    result = await db.execute(
+        select(Mockup).where(Mockup.id == mockup_id, Mockup.user_id == current_user.id)
+    )
     mockup = result.scalar_one_or_none()
 
     if not mockup:

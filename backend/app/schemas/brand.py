@@ -200,3 +200,4 @@ class BrandScenesResponse(BaseModel):
     brand_style: Optional[str]
     suggested_scenes: List[dict]  # [{template_id, reason, relevance}]
 
+

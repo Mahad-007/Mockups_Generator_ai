@@ -7,10 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import io
 
+from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.utils import get_image_url
-from app.models import Mockup
+from app.models import Mockup, User
 from app.services.export_service import export_service
+from app.services.usage_service import ensure_within_limits
 
 router = APIRouter()
 
@@ -80,6 +82,7 @@ async def get_export_presets():
 async def export_single(
     request: ExportRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Export a single mockup with specified settings.
@@ -87,13 +90,19 @@ async def export_single(
     Returns the exported image directly for download.
     """
     # Get mockup from database
-    result = await db.execute(select(Mockup).where(Mockup.id == request.mockup_id))
+    result = await db.execute(
+        select(Mockup).where(
+            Mockup.id == request.mockup_id,
+            Mockup.user_id == current_user.id,
+        )
+    )
     mockup = result.scalar_one_or_none()
 
     if not mockup:
         raise HTTPException(status_code=404, detail="Mockup not found")
 
     try:
+        await ensure_within_limits(db, current_user, "exports", increment=1)
         # Export the image
         image_bytes = await export_service.export_single(
             image_path=mockup.image_path,
@@ -134,6 +143,7 @@ async def export_single(
 async def export_batch(
     request: BatchExportRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Export multiple mockups as a ZIP file.
@@ -148,7 +158,10 @@ async def export_batch(
 
     # Get mockups from database
     result = await db.execute(
-        select(Mockup).where(Mockup.id.in_(request.mockup_ids))
+        select(Mockup).where(
+            Mockup.id.in_(request.mockup_ids),
+            Mockup.user_id == current_user.id,
+        )
     )
     mockups = result.scalars().all()
 
@@ -156,6 +169,7 @@ async def export_batch(
         raise HTTPException(status_code=404, detail="No mockups found")
 
     try:
+        await ensure_within_limits(db, current_user, "exports", increment=1)
         # Get image paths
         image_paths = [m.image_path for m in mockups]
 
@@ -187,6 +201,7 @@ async def export_batch(
 async def export_multi_preset(
     request: MultiPresetExportRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Export a single mockup to multiple preset formats as a ZIP file.
@@ -200,13 +215,19 @@ async def export_multi_preset(
         raise HTTPException(status_code=400, detail="Maximum 20 presets per export")
 
     # Get mockup from database
-    result = await db.execute(select(Mockup).where(Mockup.id == request.mockup_id))
+    result = await db.execute(
+        select(Mockup).where(
+            Mockup.id == request.mockup_id,
+            Mockup.user_id == current_user.id,
+        )
+    )
     mockup = result.scalar_one_or_none()
 
     if not mockup:
         raise HTTPException(status_code=404, detail="Mockup not found")
 
     try:
+        await ensure_within_limits(db, current_user, "exports", increment=1)
         # Export to multiple presets
         zip_bytes = await export_service.export_multi_preset(
             image_path=mockup.image_path,
@@ -233,13 +254,19 @@ async def download_mockup(
     preset_id: Optional[str] = None,
     format: str = "png",
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Quick download endpoint for a mockup.
 
     GET /export/download/{mockup_id}?preset_id=instagram-post&format=png
     """
-    result = await db.execute(select(Mockup).where(Mockup.id == mockup_id))
+    result = await db.execute(
+        select(Mockup).where(
+            Mockup.id == mockup_id,
+            Mockup.user_id == current_user.id,
+        )
+    )
     mockup = result.scalar_one_or_none()
 
     if not mockup:

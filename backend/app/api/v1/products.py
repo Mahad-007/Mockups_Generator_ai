@@ -6,11 +6,12 @@ from PIL import Image
 import io
 
 from app.core.database import get_db
+from app.api.deps import get_current_active_user
 from app.core.storage import save_upload, get_image, save_image
 from app.core.background_remover import remove_background
 from app.core.gemini import gemini_client
 from app.core.utils import get_image_url
-from app.models import Product
+from app.models import Product, User
 from app.schemas import ProductResponse
 from app.config import settings
 
@@ -21,6 +22,7 @@ router = APIRouter()
 async def upload_product(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Upload a product image.
@@ -68,6 +70,7 @@ async def upload_product(
 
     # Create database record
     product = Product(
+        user_id=current_user.id,
         original_image_path=original_path,
         processed_image_path=processed_path,
         category=analysis.get("category"),
@@ -91,10 +94,14 @@ async def upload_product(
 async def list_products(
     db: AsyncSession = Depends(get_db),
     limit: int = 20,
+    current_user: User = Depends(get_current_active_user),
 ):
     """List all products."""
     result = await db.execute(
-        select(Product).order_by(Product.created_at.desc()).limit(limit)
+        select(Product)
+        .where(Product.user_id == current_user.id)
+        .order_by(Product.created_at.desc())
+        .limit(limit)
     )
     products = result.scalars().all()
 
@@ -115,12 +122,15 @@ async def list_products(
 async def get_product(
     product_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get a specific product."""
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()
 
     if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.user_id and product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Product not found")
 
     return ProductResponse(
@@ -137,12 +147,15 @@ async def get_product(
 async def delete_product(
     product_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete a product."""
     result = await db.execute(select(Product).where(Product.id == product_id))
     product = result.scalar_one_or_none()
 
     if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.user_id and product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Product not found")
 
     await db.delete(product)

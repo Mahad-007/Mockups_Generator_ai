@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import {
   Sparkles,
   Plus,
@@ -65,6 +66,7 @@ const LIGHTING_OPTIONS = [
 ];
 
 export default function BrandsPage() {
+  const { status } = useSession();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -83,8 +85,10 @@ export default function BrandsPage() {
   }, []);
 
   useEffect(() => {
-    loadBrands();
-  }, [loadBrands]);
+    if (status === "authenticated") {
+      loadBrands();
+    }
+  }, [status, loadBrands]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this brand?")) return;

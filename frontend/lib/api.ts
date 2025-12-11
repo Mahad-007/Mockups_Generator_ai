@@ -3,6 +3,8 @@
  * KISS: Simple fetch-based client, no heavy dependencies.
  */
 
+import { getSession } from "next-auth/react";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 class ApiError extends Error {
@@ -12,15 +14,26 @@ class ApiError extends Error {
   }
 }
 
+async function buildAuthHeaders(includeAuth: boolean): Promise<HeadersInit> {
+  if (!includeAuth || typeof window === "undefined") return {};
+  const session = await getSession();
+  const token = (session as any)?.accessToken as string | undefined;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  includeAuth: boolean = true
 ): Promise<T> {
   const url = `${API_URL}/api/v1${endpoint}`;
+
+  const authHeaders = await buildAuthHeaders(includeAuth);
 
   const response = await fetch(url, {
     ...options,
     headers: {
+      ...authHeaders,
       ...options.headers,
     },
   });
@@ -32,6 +45,62 @@ async function request<T>(
 
   return response.json();
 }
+
+// Auth API
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string | null;
+  avatar_url?: string | null;
+  email_verified: boolean;
+  subscription_tier: "free" | "pro" | "agency";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  tokens: TokenResponse;
+}
+
+export interface UsageResponse {
+  tier: string;
+  counts: Record<string, number>;
+  limits: Record<string, number | null>;
+  resets_at: string | null;
+}
+
+export const authApi = {
+  register: (data: { email: string; password: string; name?: string }) =>
+    request<AuthResponse>("/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }, false),
+  login: (data: { email: string; password: string }) =>
+    request<AuthResponse>("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }, false),
+  refresh: (refresh_token: string) =>
+    request<TokenResponse>("/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token }),
+    }, false),
+};
+
+export const userApi = {
+  me: () => request<User>("/users/me"),
+  usage: () => request<UsageResponse>("/users/me/usage"),
+};
 
 // Products API
 export const productsApi = {
@@ -68,6 +137,13 @@ export const mockupsApi = {
   },
 
   get: (id: string) => request<MockupResponse>(`/mockups/${id}`),
+
+  update: (id: string, data: MockupUpdateRequest) =>
+    request<MockupResponse>(`/mockups/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
 
   delete: (id: string) =>
     request<{ message: string }>(`/mockups/${id}`, { method: "DELETE" }),
@@ -166,7 +242,12 @@ export interface MockupResponse {
   prompt_used: string | null;
   brand_id: string | null;
   brand_applied: Record<string, string> | null;
+  canvas_data: Record<string, unknown> | null;
   created_at: string;
+}
+
+export interface MockupUpdateRequest {
+  canvas_data?: Record<string, unknown>;
 }
 
 export interface SceneCustomizationOptions {
@@ -366,9 +447,10 @@ export const exportApi = {
 
   exportSingle: async (data: ExportRequest): Promise<Blob> => {
     const url = `${API_URL}/api/v1/export/single`;
+    const authHeaders = await buildAuthHeaders(true);
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -379,9 +461,10 @@ export const exportApi = {
 
   exportBatch: async (data: BatchExportRequest): Promise<Blob> => {
     const url = `${API_URL}/api/v1/export/batch`;
+    const authHeaders = await buildAuthHeaders(true);
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -392,9 +475,10 @@ export const exportApi = {
 
   exportMultiPreset: async (data: MultiPresetExportRequest): Promise<Blob> => {
     const url = `${API_URL}/api/v1/export/multi-preset`;
+    const authHeaders = await buildAuthHeaders(true);
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -617,8 +701,10 @@ export const brandsApi = {
     if (brandName) formData.append("brand_name", brandName);
     
     const url = `${API_URL}/api/v1/brands/extract`;
+    const authHeaders = await buildAuthHeaders(true);
     const response = await fetch(url, {
       method: "POST",
+      headers: { ...authHeaders },
       body: formData,
     });
     if (!response.ok) {
@@ -640,8 +726,10 @@ export const brandsApi = {
     if (isDefault) formData.append("is_default", "true");
 
     const url = `${API_URL}/api/v1/brands/extract-and-create`;
+    const authHeaders = await buildAuthHeaders(true);
     const response = await fetch(url, {
       method: "POST",
+      headers: { ...authHeaders },
       body: formData,
     });
     if (!response.ok) {
@@ -652,4 +740,34 @@ export const brandsApi = {
 
   getSuggestedScenes: (id: string) =>
     request<BrandScenesResponse>(`/brands/${id}/suggested-scenes`),
+};
+
+// Teams API (stubbed)
+export interface TeamMember {
+  user_id: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  role: "owner" | "admin" | "member";
+  members: TeamMember[];
+}
+
+export const teamApi = {
+  create: (name: string) =>
+    request<Team>("/teams/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  list: () => request<Team[]>("/teams/"),
+  invite: (teamId: string, email: string) =>
+    request<{ message: string; invite_email: string }>(`/teams/${teamId}/invite`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    }),
 };

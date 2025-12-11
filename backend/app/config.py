@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = True
 
+    # Security / Auth
+    secret_key: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_minutes: int = 60 * 24 * 14  # 14 days
+
     # URLs
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"

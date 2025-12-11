@@ -5,11 +5,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import List
 
+from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.storage import get_image, save_image
 from app.core.gemini import gemini_client
 from app.core.utils import get_image_url
-from app.models import Mockup, ChatSession, ChatMessage
+from app.models import Mockup, ChatSession, ChatMessage, User
 from app.schemas import (
     ChatSessionCreate,
     ChatMessageRequest,
@@ -95,6 +96,7 @@ REFINEMENT_SUGGESTIONS = [
 async def create_chat_session(
     request: ChatSessionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Create a new chat session for refining a mockup.
@@ -104,7 +106,12 @@ async def create_chat_session(
     - Returns session with initial state
     """
     # Get the mockup
-    result = await db.execute(select(Mockup).where(Mockup.id == request.mockup_id))
+    result = await db.execute(
+        select(Mockup).where(
+            Mockup.id == request.mockup_id,
+            Mockup.user_id == current_user.id,
+        )
+    )
     mockup = result.scalar_one_or_none()
 
     if not mockup:
@@ -144,12 +151,15 @@ async def create_chat_session(
 async def get_chat_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get a chat session with all messages."""
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.id == session_id)
         .options(selectinload(ChatSession.messages))
+        .join(Mockup, Mockup.id == ChatSession.mockup_id)
+        .where(Mockup.user_id == current_user.id)
     )
     session = result.scalar_one_or_none()
 
@@ -164,6 +174,7 @@ async def send_message(
     session_id: str,
     request: ChatMessageRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Send a refinement message and get an updated mockup.
@@ -176,6 +187,8 @@ async def send_message(
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.id == session_id)
+        .join(Mockup, Mockup.id == ChatSession.mockup_id)
+        .where(Mockup.user_id == current_user.id)
         .options(selectinload(ChatSession.messages))
     )
     session = result.scalar_one_or_none()
@@ -266,6 +279,7 @@ async def send_message(
 async def undo_last_refinement(
     session_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Undo the last refinement and revert to previous image.
@@ -275,6 +289,8 @@ async def undo_last_refinement(
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.id == session_id)
+        .join(Mockup, Mockup.id == ChatSession.mockup_id)
+        .where(Mockup.user_id == current_user.id)
         .options(selectinload(ChatSession.messages))
     )
     session = result.scalar_one_or_none()
@@ -328,10 +344,13 @@ async def list_chat_sessions(
     mockup_id: str = None,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """List chat sessions, optionally filtered by mockup."""
     query = (
         select(ChatSession)
+        .join(Mockup, Mockup.id == ChatSession.mockup_id)
+        .where(Mockup.user_id == current_user.id)
         .options(selectinload(ChatSession.messages))
         .order_by(ChatSession.updated_at.desc())
         .limit(limit)

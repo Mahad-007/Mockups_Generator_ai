@@ -383,3 +383,4 @@ Respond with ONLY valid JSON:
 # Singleton instance
 brand_extractor = BrandExtractor()
 
+

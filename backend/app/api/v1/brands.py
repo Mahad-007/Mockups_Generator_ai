@@ -5,10 +5,11 @@ from sqlalchemy import select, update
 from typing import Optional, List
 import logging
 
+from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.core.storage import save_image, get_image
 from app.core.utils import get_image_url
-from app.models import Brand
+from app.models import Brand, User
 from app.schemas import (
     BrandCreate,
     BrandUpdate,
@@ -18,6 +19,7 @@ from app.schemas import (
     BrandPromptResponse,
     BrandScenesResponse,
 )
+from app.services.usage_service import ensure_within_limits
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 async def create_brand(
     brand: BrandCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Create a new brand profile.
@@ -49,7 +52,10 @@ async def create_brand(
     # Determine preferred lighting based on mood
     preferred_lighting = brand.preferred_lighting or _get_preferred_lighting(brand.mood)
     
+    await ensure_within_limits(db, current_user, "brands_created", increment=1)
+
     db_brand = Brand(
+        user_id=current_user.id,
         name=brand.name,
         description=brand.description,
         website_url=brand.website_url,
@@ -83,9 +89,14 @@ async def create_brand(
 async def list_brands(
     db: AsyncSession = Depends(get_db),
     include_default: bool = True,
+    current_user: User = Depends(get_current_active_user),
 ):
     """List all brands for the current user."""
-    query = select(Brand).order_by(Brand.is_default.desc(), Brand.created_at.desc())
+    query = (
+        select(Brand)
+        .where(Brand.user_id == current_user.id)
+        .order_by(Brand.is_default.desc(), Brand.created_at.desc())
+    )
     
     result = await db.execute(query)
     brands = result.scalars().all()
@@ -96,10 +107,11 @@ async def list_brands(
 @router.get("/default", response_model=Optional[BrandResponse])
 async def get_default_brand(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get the default brand profile."""
     result = await db.execute(
-        select(Brand).where(Brand.is_default == True)
+        select(Brand).where(Brand.is_default == True, Brand.user_id == current_user.id)
     )
     brand = result.scalar_one_or_none()
     
@@ -113,9 +125,12 @@ async def get_default_brand(
 async def get_brand(
     brand_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Get a specific brand by ID."""
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:
@@ -129,9 +144,12 @@ async def update_brand(
     brand_id: str,
     brand_update: BrandUpdate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Update a brand profile."""
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:
@@ -166,9 +184,12 @@ async def update_brand(
 async def delete_brand(
     brand_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Delete a brand."""
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:
@@ -183,9 +204,12 @@ async def delete_brand(
 async def set_default_brand(
     brand_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Set a brand as the default."""
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:
@@ -209,9 +233,12 @@ async def upload_brand_logo(
     brand_id: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Upload a logo for a brand."""
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:
@@ -240,6 +267,7 @@ async def extract_brand(
     website_url: Optional[str] = Form(None),
     brand_name: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Extract brand colors and style from logo or website.
@@ -350,6 +378,7 @@ async def extract_and_create_brand(
     website_url: Optional[str] = Form(None),
     is_default: bool = Form(False),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Extract brand from logo/website and create a new brand profile.
@@ -403,6 +432,9 @@ async def extract_and_create_brand(
         except Exception:
             pass
     
+    # Enforce usage limits
+    await ensure_within_limits(db, current_user, "brands_created", increment=1)
+
     # If setting as default, unset others
     if is_default:
         await db.execute(
@@ -420,6 +452,7 @@ async def extract_and_create_brand(
     
     # Create brand
     db_brand = Brand(
+        user_id=current_user.id,
         name=name,
         website_url=website_url,
         logo_url=get_image_url(logo_path) if logo_path else None,
@@ -450,6 +483,7 @@ async def get_brand_prompt(
     brand_id: str,
     base_prompt: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get a brand-enhanced version of a scene prompt.
@@ -457,7 +491,9 @@ async def get_brand_prompt(
     Takes a base scene prompt and enhances it with brand attributes
     for consistent brand styling in mockups.
     """
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:
@@ -477,6 +513,7 @@ async def get_brand_prompt(
 async def get_brand_scenes(
     brand_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get scene template suggestions based on brand attributes.
@@ -485,7 +522,9 @@ async def get_brand_scenes(
     """
     from app.core.scene_generator import get_template
     
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == current_user.id)
+    )
     brand = result.scalar_one_or_none()
     
     if not brand:

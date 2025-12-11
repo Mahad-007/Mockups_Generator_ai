@@ -19,6 +19,16 @@ from app.schemas.brand import (
     BrandPromptResponse,
     BrandScenesResponse,
 )
+from app.schemas.user import (
+    UserBase,
+    UserCreate,
+    UserLogin,
+    UserUpdate,
+    UserResponse,
+    TokenResponse,
+    AuthResponse,
+    UsageResponse,
+)
 
 __all__ = [
     "ProductBase",
@@ -42,4 +52,13 @@ __all__ = [
     "BrandExtractResponse",
     "BrandPromptResponse",
     "BrandScenesResponse",
+    # User schemas
+    "UserBase",
+    "UserCreate",
+    "UserLogin",
+    "UserUpdate",
+    "UserResponse",
+    "TokenResponse",
+    "AuthResponse",
+    "UsageResponse",
 ]

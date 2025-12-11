@@ -31,10 +31,16 @@ class MockupResponse(BaseModel):
     prompt_used: Optional[str] = None
     brand_id: Optional[str] = None
     brand_applied: Optional[Dict[str, Any]] = None  # Details of brand styling applied
+    canvas_data: Optional[Dict[str, Any]] = None  # Canvas editor state (Phase 9)
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class MockupUpdateRequest(BaseModel):
+    """Request schema for updating a mockup."""
+    canvas_data: Optional[Dict[str, Any]] = None  # Canvas editor state
 
 
 class GenerationStatus(BaseModel):
