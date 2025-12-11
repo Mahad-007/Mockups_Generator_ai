@@ -57,7 +57,7 @@ export default function ProductUploader({ onUpload }: ProductUploaderProps) {
   if (preview) {
     return (
       <div className="relative">
-        <div className="aspect-square bg-gray-100 rounded-xl overflow-hidden">
+        <div className="aspect-square bg-secondary border-3 border-foreground shadow-brutal overflow-hidden">
           <img
             src={preview}
             alt="Product preview"
@@ -65,20 +65,20 @@ export default function ProductUploader({ onUpload }: ProductUploaderProps) {
           />
         </div>
         {isUploading && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-xl">
+          <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
             <div className="text-white text-center">
-              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-              <p>Processing image...</p>
-              <p className="text-sm text-gray-300 mt-1">Removing background & analyzing</p>
+              <div className="w-10 h-10 border-3 border-white border-t-transparent animate-spin mx-auto mb-3"></div>
+              <p className="font-bold uppercase tracking-wide">Processing image...</p>
+              <p className="text-sm font-medium mt-2">Removing background & analyzing</p>
             </div>
           </div>
         )}
         {!isUploading && (
           <button
             onClick={clearPreview}
-            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100"
+            className="absolute top-4 right-4 p-2 bg-white border-3 border-foreground shadow-brutal hover:shadow-brutal-lg hover:-translate-x-0.5 hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 active:shadow-none transition-all"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
@@ -88,38 +88,40 @@ export default function ProductUploader({ onUpload }: ProductUploaderProps) {
   return (
     <div>
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-          <AlertCircle className="w-5 h-5" />
-          {error}
+        <div className="mb-4 p-4 bg-destructive/10 border-3 border-destructive shadow-brutal-sm flex items-center gap-3 text-destructive">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="font-bold">{error}</span>
         </div>
       )}
       <div
         {...getRootProps()}
         className={`
-          border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition
+          border-3 p-12 text-center cursor-pointer transition-all
           ${
             isDragActive
-              ? "border-primary bg-primary/5"
-              : "border-gray-300 hover:border-primary hover:bg-gray-50"
+              ? "border-foreground bg-accent shadow-brutal-lg -translate-x-0.5 -translate-y-0.5"
+              : "border-foreground bg-background shadow-brutal hover:shadow-brutal-lg hover:-translate-x-0.5 hover:-translate-y-0.5"
           }
         `}
       >
         <input {...getInputProps()} />
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-20 h-20 bg-secondary border-3 border-foreground shadow-brutal-sm flex items-center justify-center">
             {isDragActive ? (
-              <ImageIcon className="w-8 h-8 text-primary" />
+              <ImageIcon className="w-10 h-10 text-foreground" />
             ) : (
-              <Upload className="w-8 h-8 text-gray-400" />
+              <Upload className="w-10 h-10 text-foreground" />
             )}
           </div>
           <div>
-            <p className="font-medium text-lg">
+            <p className="font-black uppercase text-xl tracking-wide">
               {isDragActive ? "Drop your image here" : "Drag & drop your product image"}
             </p>
-            <p className="text-gray-500 mt-1">or click to browse</p>
+            <p className="text-muted-foreground font-bold mt-2 uppercase text-sm">or click to browse</p>
           </div>
-          <p className="text-sm text-gray-400">PNG, JPG, WEBP up to 10MB</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground px-4 py-2 bg-secondary border-3 border-foreground">
+            PNG, JPG, WEBP up to 10MB
+          </p>
         </div>
       </div>
     </div>

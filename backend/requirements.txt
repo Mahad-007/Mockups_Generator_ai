@@ -18,7 +18,7 @@ bcrypt==4.1.2
 # AI/ML
 google-generativeai==0.8.3
 pillow==10.2.0
-rembg==2.0.50
+rembg==2.0.59  # Updated for Python 3.12 support
 
 # HTTP client
 httpx==0.26.0

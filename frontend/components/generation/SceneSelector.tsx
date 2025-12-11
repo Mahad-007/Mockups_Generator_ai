@@ -125,7 +125,7 @@ export default function SceneSelector({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-foreground" />
       </div>
     );
   }
@@ -134,43 +134,43 @@ export default function SceneSelector({
     <div className="space-y-4">
       {/* Search Bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search scenes..."
-          className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+          placeholder="SEARCH SCENES..."
+          className="w-full pl-12 pr-12 py-3 border-3 border-foreground bg-background font-bold uppercase tracking-wide text-sm shadow-brutal-sm focus:outline-none focus:shadow-brutal focus:-translate-x-0.5 focus:-translate-y-0.5 transition-all placeholder:text-muted-foreground placeholder:font-bold"
         />
         {(searchQuery || selectedTags.length > 0) && (
           <button
             onClick={clearFilters}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground hover:text-accent-foreground hover:bg-accent p-1 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      <div className="flex gap-3 overflow-x-auto pb-2">
         {categories.map((category) => (
           <button
             key={category}
             onClick={() => setActiveCategory(category)}
-            className={`px-4 py-2 rounded-full whitespace-nowrap transition flex items-center gap-2 ${
+            className={`px-5 py-2.5 whitespace-nowrap transition-all flex items-center gap-2 font-bold uppercase text-xs tracking-wide border-3 border-foreground ${
               activeCategory === category
-                ? "bg-primary text-primary-foreground"
-                : "bg-gray-100 hover:bg-gray-200"
+                ? "bg-primary text-primary-foreground shadow-brutal"
+                : "bg-secondary text-secondary-foreground shadow-brutal-sm hover:shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5"
             }`}
           >
             {category === "favorites" && <Heart className="w-4 h-4" />}
             {CATEGORY_LABELS[category] || category}
             {category !== "all" && category !== "favorites" && categoryCounts[category] && (
-              <span className="text-xs opacity-70">({categoryCounts[category]})</span>
+              <span className="text-[10px] opacity-70">({categoryCounts[category]})</span>
             )}
             {category === "favorites" && (
-              <span className="text-xs opacity-70">({favorites.length})</span>
+              <span className="text-[10px] opacity-70">({favorites.length})</span>
             )}
           </button>
         ))}
@@ -183,10 +183,10 @@ export default function SceneSelector({
             <button
               key={tag.name}
               onClick={() => toggleTag(tag.name)}
-              className={`px-3 py-1 text-xs rounded-full transition ${
+              className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wide border-3 border-foreground transition-all ${
                 selectedTags.includes(tag.name)
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 hover:bg-gray-200"
+                  ? "bg-accent text-accent-foreground shadow-brutal"
+                  : "bg-background text-foreground shadow-brutal-sm hover:shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5"
               }`}
             >
               {tag.name}
@@ -201,37 +201,37 @@ export default function SceneSelector({
           <div key={scene.id} className="relative group">
             <button
               onClick={() => handleSelect(scene.id)}
-              className={`w-full relative rounded-xl overflow-hidden border-2 transition ${
+              className={`w-full relative overflow-hidden border-3 transition-all ${
                 selectedScene === scene.id
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "border-transparent hover:border-gray-300"
+                  ? "border-foreground shadow-brutal-lg -translate-x-0.5 -translate-y-0.5"
+                  : "border-foreground shadow-brutal hover:shadow-brutal-lg hover:-translate-x-0.5 hover:-translate-y-0.5"
               }`}
             >
-              <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                <span className="text-gray-500 text-sm text-center px-2">
+              <div className="aspect-square bg-gradient-to-br from-secondary to-muted flex items-center justify-center">
+                <span className="text-foreground text-sm font-bold uppercase text-center px-2">
                   {scene.name}
                 </span>
               </div>
 
               {/* Premium Badge */}
               {scene.is_premium && (
-                <div className="absolute top-2 left-2 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-xs rounded-full flex items-center gap-1">
-                  <Star className="w-3 h-3" />
+                <div className="absolute top-3 left-3 px-3 py-1 bg-brutal-yellow border-3 border-foreground text-foreground text-xs font-black uppercase flex items-center gap-1.5 shadow-brutal-sm">
+                  <Star className="w-3 h-3 fill-current" />
                   Premium
                 </div>
               )}
 
               {/* Selected Check */}
               {selectedScene === scene.id && (
-                <div className="absolute top-2 right-2 w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center">
-                  <Check className="w-4 h-4" />
+                <div className="absolute top-3 right-3 w-8 h-8 bg-primary border-3 border-foreground text-primary-foreground flex items-center justify-center shadow-brutal-sm">
+                  <Check className="w-5 h-5 stroke-[3]" />
                 </div>
               )}
 
               {/* Scene Info */}
-              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
-                <p className="text-white text-sm font-medium">{scene.name}</p>
-                <p className="text-white/70 text-xs">{scene.category}</p>
+              <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/80 border-t-3 border-foreground">
+                <p className="text-white text-sm font-black uppercase">{scene.name}</p>
+                <p className="text-white/80 text-xs font-bold uppercase">{scene.category}</p>
               </div>
             </button>
 
@@ -241,12 +241,12 @@ export default function SceneSelector({
                 e.stopPropagation();
                 toggleFavorite(scene.id);
               }}
-              className={`absolute top-2 right-2 p-1.5 rounded-full transition z-10 ${
-                selectedScene === scene.id ? "right-10" : ""
+              className={`absolute top-3 right-3 p-2 transition-all z-10 border-3 border-foreground shadow-brutal-sm ${
+                selectedScene === scene.id ? "right-14" : ""
               } ${
                 isFavorite(scene.id)
-                  ? "bg-red-500 text-white"
-                  : "bg-white/80 text-gray-600 opacity-0 group-hover:opacity-100"
+                  ? "bg-brutal-pink text-white"
+                  : "bg-white text-foreground opacity-0 group-hover:opacity-100 hover:shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5"
               }`}
             >
               <Heart
@@ -258,8 +258,8 @@ export default function SceneSelector({
       </div>
 
       {filteredTemplates.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-gray-500">
+        <div className="text-center py-8 px-6 border-3 border-foreground bg-muted shadow-brutal">
+          <p className="text-foreground font-bold uppercase tracking-wide">
             {activeCategory === "favorites"
               ? "No favorites yet. Click the heart icon on scenes to add them!"
               : "No scenes match your filters"}
@@ -267,7 +267,7 @@ export default function SceneSelector({
           {(searchQuery || selectedTags.length > 0) && (
             <button
               onClick={clearFilters}
-              className="mt-2 text-primary hover:underline"
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground border-3 border-foreground shadow-brutal hover:shadow-brutal-lg hover:-translate-x-0.5 hover:-translate-y-0.5 font-bold uppercase text-xs transition-all"
             >
               Clear filters
             </button>
@@ -277,26 +277,26 @@ export default function SceneSelector({
 
       {/* Customization Panel */}
       {selectedTemplate && (
-        <div className="mt-6 p-4 border rounded-xl bg-gray-50">
+        <div className="mt-6 p-6 border-3 border-foreground bg-secondary shadow-brutal">
           <button
             onClick={() => setShowCustomization(!showCustomization)}
             className="flex items-center justify-between w-full"
           >
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="w-5 h-5" />
-              <span className="font-medium">Customize Scene</span>
+            <div className="flex items-center gap-3">
+              <SlidersHorizontal className="w-5 h-5 text-foreground" />
+              <span className="font-black uppercase tracking-wide text-sm">Customize Scene</span>
             </div>
-            <span className="text-sm text-gray-500">
+            <span className="text-xs font-bold uppercase text-muted-foreground">
               {showCustomization ? "Hide" : "Show"} options
             </span>
           </button>
 
           {showCustomization && (
-            <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="mt-6 grid grid-cols-2 gap-4">
               {/* Color Options */}
               {selectedTemplate.customization.colors.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Color</label>
+                  <label className="block text-xs font-bold uppercase tracking-wide mb-2">Color</label>
                   <select
                     value={customization.color || ""}
                     onChange={(e) =>
@@ -305,7 +305,7 @@ export default function SceneSelector({
                         color: e.target.value || undefined,
                       }))
                     }
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-3 border-3 border-foreground bg-background font-bold text-sm shadow-brutal-sm focus:outline-none focus:shadow-brutal focus:-translate-x-0.5 focus:-translate-y-0.5 transition-all"
                   >
                     <option value="">Default</option>
                     {selectedTemplate.customization.colors.map((color) => (
@@ -320,7 +320,7 @@ export default function SceneSelector({
               {/* Surface Options */}
               {selectedTemplate.customization.surfaces.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Surface</label>
+                  <label className="block text-xs font-bold uppercase tracking-wide mb-2">Surface</label>
                   <select
                     value={customization.surface || ""}
                     onChange={(e) =>
@@ -329,7 +329,7 @@ export default function SceneSelector({
                         surface: e.target.value || undefined,
                       }))
                     }
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-3 border-3 border-foreground bg-background font-bold text-sm shadow-brutal-sm focus:outline-none focus:shadow-brutal focus:-translate-x-0.5 focus:-translate-y-0.5 transition-all"
                   >
                     <option value="">Default</option>
                     {selectedTemplate.customization.surfaces.map((surface) => (
@@ -344,7 +344,7 @@ export default function SceneSelector({
               {/* Lighting Options */}
               {selectedTemplate.customization.lighting.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Lighting</label>
+                  <label className="block text-xs font-bold uppercase tracking-wide mb-2">Lighting</label>
                   <select
                     value={customization.lighting || ""}
                     onChange={(e) =>
@@ -353,7 +353,7 @@ export default function SceneSelector({
                         lighting: e.target.value || undefined,
                       }))
                     }
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-3 border-3 border-foreground bg-background font-bold text-sm shadow-brutal-sm focus:outline-none focus:shadow-brutal focus:-translate-x-0.5 focus:-translate-y-0.5 transition-all"
                   >
                     <option value="">Default</option>
                     {selectedTemplate.customization.lighting.map((light) => (
@@ -368,7 +368,7 @@ export default function SceneSelector({
               {/* Angle Options */}
               {selectedTemplate.customization.angles.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Angle</label>
+                  <label className="block text-xs font-bold uppercase tracking-wide mb-2">Angle</label>
                   <select
                     value={customization.angle || ""}
                     onChange={(e) =>
@@ -377,7 +377,7 @@ export default function SceneSelector({
                         angle: e.target.value || undefined,
                       }))
                     }
-                    className="w-full p-2 border rounded-lg"
+                    className="w-full p-3 border-3 border-foreground bg-background font-bold text-sm shadow-brutal-sm focus:outline-none focus:shadow-brutal focus:-translate-x-0.5 focus:-translate-y-0.5 transition-all"
                   >
                     <option value="">Default</option>
                     {selectedTemplate.customization.angles.map((angle) => (

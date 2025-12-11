@@ -57,24 +57,24 @@ export default function BrandSelector({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border p-4 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
-        <div className="h-10 bg-gray-200 rounded"></div>
+      <div className="bg-card border-3 border-foreground p-6 animate-pulse shadow-brutal">
+        <div className="h-6 bg-secondary w-32 mb-3"></div>
+        <div className="h-12 bg-secondary border-3 border-foreground"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Palette className="w-5 h-5 text-violet-600" />
-          <span className="font-medium text-gray-900">Brand Styling</span>
+    <div className="bg-card border-3 border-foreground p-6 shadow-brutal">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Palette className="w-6 h-6 text-foreground" />
+          <span className="font-black uppercase tracking-wide text-sm">Brand Styling</span>
         </div>
         {brands.length > 0 && (
           <Link
             href="/brands"
-            className="text-sm text-violet-600 hover:text-violet-700"
+            className="text-xs font-bold uppercase tracking-wide px-3 py-1.5 bg-accent text-accent-foreground border-3 border-foreground shadow-brutal-sm hover:shadow-brutal hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
           >
             Manage Brands
           </Link>
@@ -82,14 +82,14 @@ export default function BrandSelector({
       </div>
 
       {brands.length === 0 ? (
-        <div className="text-center py-4">
-          <Palette className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 mb-3">
+        <div className="text-center py-8 px-4 bg-muted border-3 border-foreground">
+          <Palette className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm font-bold uppercase text-muted-foreground mb-4">
             No brands created yet
           </p>
           <Link
             href="/brands"
-            className="inline-flex items-center gap-1 text-sm text-violet-600 hover:text-violet-700"
+            className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide px-4 py-2.5 bg-primary text-primary-foreground border-3 border-foreground shadow-brutal hover:shadow-brutal-lg hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all"
           >
             <Plus className="w-4 h-4" />
             Create a Brand
@@ -99,16 +99,16 @@ export default function BrandSelector({
         <div className="relative">
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className={`w-full flex items-center justify-between px-3 py-2 border rounded-lg transition ${
+            className={`w-full flex items-center justify-between px-4 py-3 border-3 border-foreground transition-all font-bold ${
               isOpen
-                ? "border-violet-500 ring-2 ring-violet-200"
-                : "border-gray-200 hover:border-gray-300"
+                ? "bg-accent shadow-brutal-lg -translate-x-0.5 -translate-y-0.5"
+                : "bg-background shadow-brutal hover:shadow-brutal-lg hover:-translate-x-0.5 hover:-translate-y-0.5"
             }`}
           >
             {selectedBrand ? (
               <div className="flex items-center gap-3">
                 {/* Brand Color Indicator */}
-                <div className="flex -space-x-1">
+                <div className="flex -space-x-1.5">
                   {[
                     selectedBrand.primary_color,
                     selectedBrand.secondary_color,
@@ -119,25 +119,25 @@ export default function BrandSelector({
                     .map((color, i) => (
                       <div
                         key={i}
-                        className="w-5 h-5 rounded-full border-2 border-white"
+                        className="w-6 h-6 border-3 border-foreground shadow-brutal-sm"
                         style={{ backgroundColor: color! }}
                       />
                     ))}
                 </div>
                 <div className="text-left">
-                  <p className="font-medium text-sm">{selectedBrand.name}</p>
+                  <p className="font-black uppercase text-sm tracking-wide">{selectedBrand.name}</p>
                   {selectedBrand.mood && (
-                    <p className="text-xs text-gray-500 capitalize">
+                    <p className="text-xs text-muted-foreground font-bold uppercase">
                       {selectedBrand.mood} • {selectedBrand.style || "default"}
                     </p>
                   )}
                 </div>
               </div>
             ) : (
-              <span className="text-gray-500">No brand selected</span>
+              <span className="text-muted-foreground uppercase text-sm">No brand selected</span>
             )}
             <ChevronDown
-              className={`w-5 h-5 text-gray-400 transition-transform ${
+              className={`w-5 h-5 text-foreground transition-transform ${
                 isOpen ? "rotate-180" : ""
               }`}
             />
@@ -145,33 +145,31 @@ export default function BrandSelector({
 
           {/* Dropdown */}
           {isOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-background border-3 border-foreground shadow-brutal-lg z-10 max-h-60 overflow-y-auto">
               {/* No brand option */}
               <button
                 onClick={() => handleSelect(null)}
-                className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition ${
-                  !selectedBrand ? "bg-violet-50" : ""
+                className={`w-full flex items-center justify-between px-4 py-3 hover:bg-muted transition-colors border-b-3 border-foreground ${
+                  !selectedBrand ? "bg-accent" : "bg-background"
                 }`}
               >
-                <span className="text-gray-500">No brand styling</span>
+                <span className="text-muted-foreground font-bold uppercase text-xs">No brand styling</span>
                 {!selectedBrand && (
-                  <Check className="w-4 h-4 text-violet-600" />
+                  <Check className="w-5 h-5 text-foreground stroke-[3]" />
                 )}
               </button>
-
-              <div className="border-t" />
 
               {/* Brand options */}
               {brands.map((brand) => (
                 <button
                   key={brand.id}
                   onClick={() => handleSelect(brand)}
-                  className={`w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition ${
-                    selectedBrand?.id === brand.id ? "bg-violet-50" : ""
+                  className={`w-full flex items-center justify-between px-4 py-3 hover:bg-muted transition-colors border-b-3 border-foreground last:border-b-0 ${
+                    selectedBrand?.id === brand.id ? "bg-accent" : "bg-background"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex -space-x-1">
+                    <div className="flex -space-x-1.5">
                       {[
                         brand.primary_color,
                         brand.secondary_color,
@@ -182,32 +180,32 @@ export default function BrandSelector({
                         .map((color, i) => (
                           <div
                             key={i}
-                            className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
+                            className="w-6 h-6 border-3 border-foreground shadow-brutal-sm"
                             style={{ backgroundColor: color! }}
                           />
                         ))}
                       {!brand.primary_color && (
-                        <div className="w-5 h-5 rounded-full bg-gray-200" />
+                        <div className="w-6 h-6 bg-secondary border-3 border-foreground" />
                       )}
                     </div>
                     <div className="text-left">
-                      <p className="font-medium text-sm flex items-center gap-1">
+                      <p className="font-black uppercase text-xs tracking-wide flex items-center gap-2">
                         {brand.name}
                         {brand.is_default && (
-                          <span className="px-1.5 py-0.5 text-xs bg-violet-100 text-violet-700 rounded">
+                          <span className="px-2 py-0.5 text-[10px] bg-brutal-yellow border-2 border-foreground font-black uppercase">
                             Default
                           </span>
                         )}
                       </p>
                       {brand.mood && (
-                        <p className="text-xs text-gray-500 capitalize">
+                        <p className="text-xs text-muted-foreground font-bold uppercase mt-0.5">
                           {brand.mood}
                         </p>
                       )}
                     </div>
                   </div>
                   {selectedBrand?.id === brand.id && (
-                    <Check className="w-4 h-4 text-violet-600" />
+                    <Check className="w-5 h-5 text-foreground stroke-[3]" />
                   )}
                 </button>
               ))}
@@ -218,36 +216,36 @@ export default function BrandSelector({
 
       {/* Selected Brand Preview */}
       {selectedBrand && (
-        <div className="mt-3 p-3 bg-gradient-to-r from-violet-50 to-indigo-50 rounded-lg">
-          <div className="flex items-center gap-2 text-sm text-violet-700 mb-2">
-            <Sparkles className="w-4 h-4" />
-            <span className="font-medium">Brand styling will be applied</span>
+        <div className="mt-4 p-4 bg-brutal-cyan/20 border-3 border-foreground shadow-brutal-sm">
+          <div className="flex items-center gap-2 text-sm text-foreground mb-3">
+            <Sparkles className="w-5 h-5" />
+            <span className="font-black uppercase tracking-wide">Brand styling will be applied</span>
           </div>
-          <div className="text-xs text-gray-600 space-y-1">
+          <div className="text-xs font-bold space-y-1.5">
             {selectedBrand.mood && (
-              <p>
-                Mood: <span className="capitalize">{selectedBrand.mood}</span>
+              <p className="uppercase">
+                Mood: <span className="capitalize font-black">{selectedBrand.mood}</span>
               </p>
             )}
             {selectedBrand.preferred_lighting && (
-              <p>
+              <p className="uppercase">
                 Lighting:{" "}
-                <span className="capitalize">
+                <span className="capitalize font-black">
                   {selectedBrand.preferred_lighting}
                 </span>
               </p>
             )}
             {selectedBrand.primary_color && (
-              <p>
+              <p className="uppercase">
                 Colors will influence scene palette
               </p>
             )}
           </div>
           <button
             onClick={() => handleSelect(null)}
-            className="mt-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            className="mt-3 text-xs font-bold uppercase text-foreground hover:text-destructive flex items-center gap-1.5 px-2 py-1 hover:bg-background transition-colors"
           >
-            <X className="w-3 h-3" />
+            <X className="w-4 h-4" />
             Remove brand styling
           </button>
         </div>

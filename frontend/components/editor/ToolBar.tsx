@@ -159,36 +159,36 @@ export default function ToolBar({
   };
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-white border-b">
+    <div className="flex items-center gap-3 p-4 bg-background border-b-3 border-foreground shadow-brutal-sm">
       {/* Selection Tools */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" title="Select (V)">
-          <MousePointer2 className="w-4 h-4" />
+          <MousePointer2 className="w-5 h-5" />
         </Button>
         <Button variant="ghost" size="icon" title="Pan (Hold Alt)" onClick={enablePan}>
-          <Move className="w-4 h-4" />
+          <Move className="w-5 h-5" />
         </Button>
       </div>
 
-      <Separator orientation="vertical" className="h-8" />
+      <Separator orientation="vertical" className="h-10" />
 
       {/* Add Elements */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={addText} title="Add Text (T)">
-          <Type className="w-4 h-4" />
+          <Type className="w-5 h-5" />
         </Button>
         <Button variant="ghost" size="icon" onClick={addRectangle} title="Add Rectangle (R)">
-          <Square className="w-4 h-4" />
+          <Square className="w-5 h-5" />
         </Button>
         <Button variant="ghost" size="icon" onClick={addCircle} title="Add Circle (C)">
-          <Circle className="w-4 h-4" />
+          <Circle className="w-5 h-5" />
         </Button>
       </div>
 
-      <Separator orientation="vertical" className="h-8" />
+      <Separator orientation="vertical" className="h-10" />
 
       {/* Actions */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <Button
           variant="ghost"
           size="icon"
@@ -196,7 +196,7 @@ export default function ToolBar({
           disabled={!canUndo}
           title="Undo (Ctrl+Z)"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-5 h-5" />
         </Button>
         <Button
           variant="ghost"
@@ -205,7 +205,7 @@ export default function ToolBar({
           disabled={!canRedo}
           title="Redo (Ctrl+Y)"
         >
-          <RotateCw className="w-4 h-4" />
+          <RotateCw className="w-5 h-5" />
         </Button>
         <Button
           variant="ghost"
@@ -213,22 +213,22 @@ export default function ToolBar({
           onClick={deleteSelected}
           title="Delete (Del)"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-5 h-5" />
         </Button>
       </div>
 
-      <Separator orientation="vertical" className="h-8" />
+      <Separator orientation="vertical" className="h-10" />
 
       {/* Zoom Controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={zoomOut} title="Zoom Out (-)">
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-5 h-5" />
         </Button>
         <Button variant="ghost" size="icon" onClick={resetZoom} title="Reset Zoom (0)">
-          <span className="text-xs font-medium">100%</span>
+          <span className="text-xs font-black uppercase">100%</span>
         </Button>
         <Button variant="ghost" size="icon" onClick={zoomIn} title="Zoom In (+)">
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-5 h-5" />
         </Button>
       </div>
 
@@ -236,7 +236,7 @@ export default function ToolBar({
 
       {/* Save/Export */}
       <Button onClick={onSave} className="gap-2">
-        <Download className="w-4 h-4" />
+        <Download className="w-5 h-5" />
         Save Changes
       </Button>
     </div>

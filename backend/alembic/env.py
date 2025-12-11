@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.models.base import Base
-from app.models import User, Product, Mockup, Brand, SceneTemplate, Team, TeamMembership
+from app.models import User, Product, Mockup, Brand, Team, TeamMembership, ChatSession, ChatMessage
 from app.config import settings
 
 config = context.config

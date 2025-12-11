@@ -1,6 +1,6 @@
 """Pydantic schemas."""
 from app.schemas.product import ProductBase, ProductCreate, ProductResponse
-from app.schemas.mockup import MockupGenerateRequest, MockupResponse, GenerationStatus
+from app.schemas.mockup import MockupGenerateRequest, MockupResponse, MockupUpdateRequest, GenerationStatus
 from app.schemas.chat import (
     ChatSessionCreate,
     ChatMessageRequest,
@@ -36,6 +36,7 @@ __all__ = [
     "ProductResponse",
     "MockupGenerateRequest",
     "MockupResponse",
+    "MockupUpdateRequest",
     "GenerationStatus",
     "ChatSessionCreate",
     "ChatMessageRequest",

@@ -43,11 +43,30 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Neo-brutalism accent colors
+        brutal: {
+          yellow: "hsl(var(--brutal-yellow))",
+          pink: "hsl(var(--brutal-pink))",
+          cyan: "hsl(var(--brutal-cyan))",
+          green: "hsl(var(--brutal-green))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      borderWidth: {
+        3: "3px",
+        5: "5px",
+      },
+      boxShadow: {
+        brutal: "var(--shadow-brutal)",
+        "brutal-sm": "var(--shadow-brutal-sm)",
+        "brutal-lg": "var(--shadow-brutal-lg)",
+      },
+      fontWeight: {
+        black: "900",
       },
     },
   },
